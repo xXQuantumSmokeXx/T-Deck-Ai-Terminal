@@ -72,8 +72,8 @@
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 #define COL_BG       TFT_BLACK
-#define COL_YOU      0x041F   // cyan blue
-#define COL_AI       0x07F0   // cyan green
+#define COL_YOU      0x04FF   // azure blue  RGB(0, 158, 255)
+#define COL_AI       0x07EC   // spring green RGB(0, 252, 99)
 #define COL_SYS      0x7BEF   // light grey
 #define COL_INPUT_BG 0x1082   // very dark grey
 #define COL_INPUT    TFT_WHITE
