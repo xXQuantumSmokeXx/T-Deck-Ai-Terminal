@@ -2,6 +2,8 @@
 
 AI chat terminal firmware for the LILYGO T-Deck (ESP32-S3). Supports OpenAI, Anthropic Claude, Groq, Ollama, and any OpenAI-compatible backend.
 
+[![Support on Patreon](https://img.shields.io/badge/Support-Patreon-orange)](https://www.patreon.com/posts/mayday-terminal-157368449)
+
 ## Hardware Required
 
 - [LILYGO T-Deck](https://www.lilygo.cc/products/t-deck) (ESP32-S3 version)
