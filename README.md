@@ -16,6 +16,8 @@ AI chat terminal firmware for the LILYGO T-Deck (ESP32-S3). Supports OpenAI, Ant
 
 ## SD Card Setup (Recommended)
 
+Ready-to-use example files are in the [`config-examples/`](config-examples/) folder. Copy the one for your provider, rename it to `config.txt`, fill in your key, and drop it on the SD card root.
+
 Drop these files in the **root** of the SD card before first boot. They self-destruct after being read.
 
 ### `wifi.txt`
