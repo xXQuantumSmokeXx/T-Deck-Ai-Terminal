@@ -1,20 +1,37 @@
 /**
  * MayDay Terminal — AI chat client for the LILYGO T-Deck
  * --------------------------------------------------------
- * On first boot you will be prompted to enter:
- *   1. WiFi SSID and password
- *   2. Your server URL (e.g. https://your-ngrok-url.ngrok-free.app)
+ * Supports OpenAI-compatible APIs (OpenAI, Groq, Ollama, etc.)
+ * and Anthropic Claude natively.
  *
- * Commands (type and press Enter):
+ * Quick setup via SD card (files self-destruct after read):
+ *
+ *   wifi.txt     — line 1: SSID,  line 2: password
+ *
+ *   config.txt   — API settings:
+ *     type:  openai              (or: anthropic)
+ *     key:   sk-...
+ *     url:   https://api.openai.com/v1   (openai only; blank = default)
+ *     model: gpt-4o-mini                (blank = default)
+ *
+ * On-device commands (type and press Enter):
  *   setwifi  — change WiFi credentials
- *   seturl   — change server URL
- *   six      — talk to Six (purple)
- *   nova     — talk to Nova (red)
+ *   setapi   — reconfigure API (type / key / URL / model)
+ *   clear    — clear chat and conversation context
  *
- * Trackball UP/DOWN scrolls chat history.
+ * Trackball UP scrolls up, DOWN scrolls down through history.
  *
- * Backend spec: POST {"message":"..."} → {"response":"..."}
- * Compatible with MayDay Portal or any server implementing /simple
+ * OpenAI-compatible spec:
+ *   POST {url}/chat/completions
+ *   Authorization: Bearer {key}
+ *   {"model":"...","messages":[{"role":"user","content":"..."},...]}
+ *   Response: {"choices":[{"message":{"content":"..."}}]}
+ *
+ * Anthropic spec:
+ *   POST https://api.anthropic.com/v1/messages
+ *   x-api-key: {key}  |  anthropic-version: 2023-06-01
+ *   {"model":"...","max_tokens":1024,"messages":[...]}
+ *   Response: {"content":[{"type":"text","text":"..."}]}
  */
 
 #include <Arduino.h>
@@ -56,18 +73,43 @@
 // ── Colors ────────────────────────────────────────────────────────────────────
 #define COL_BG       TFT_BLACK
 #define COL_YOU      0x07FF   // cyan
-#define COL_SIX      0xC81F   // purple
-#define COL_NOVA     0xF800   // red
+#define COL_AI       0xC81F   // purple
 #define COL_SYS      0x7BEF   // light grey
 #define COL_INPUT_BG 0x1082   // very dark grey
 #define COL_INPUT    TFT_WHITE
 #define COL_PROMPT   0xFD20   // orange
 #define COL_SCROLL   0x4208   // dim grey
 
+// ── Conversation context ──────────────────────────────────────────────────────
+#define CTX_MAX_PAIRS   6
+#define CTX_SLOTS       (CTX_MAX_PAIRS * 2)
+#define CTX_MSG_MAX     500
+
+struct CtxMsg { String role; String content; };
+CtxMsg convCtx[CTX_SLOTS];
+int    ctxCount = 0;
+
+void ctxAddPair(const String &userMsg, const String &assistantMsg) {
+    if (ctxCount >= CTX_SLOTS) {
+        for (int i = 0; i < CTX_SLOTS - 2; i++) convCtx[i] = convCtx[i + 2];
+        ctxCount = CTX_SLOTS - 2;
+    }
+    String u = userMsg;      if ((int)u.length() > CTX_MSG_MAX) u = u.substring(0, CTX_MSG_MAX);
+    String a = assistantMsg; if ((int)a.length() > CTX_MSG_MAX) a = a.substring(0, CTX_MSG_MAX);
+    convCtx[ctxCount++] = { "user",      u };
+    convCtx[ctxCount++] = { "assistant", a };
+}
+
+void ctxClear() { ctxCount = 0; }
+
+// ── Globals ───────────────────────────────────────────────────────────────────
 TFT_eSPI    tft;
 Preferences prefs;
-String      activeAgent = "six";
-String      serverBase  = "";   // loaded from NVS at boot
+
+String apiType  = "";
+String apiKey   = "";
+String apiUrl   = "";
+String apiModel = "";
 
 // ── Chat history ──────────────────────────────────────────────────────────────
 struct ChatLine { String text; uint16_t color; };
@@ -102,9 +144,9 @@ void redrawChat() {
     }
     tft.fillRect(SCREEN_W - 4, 0, 4, INPUT_Y - 1, COL_BG);
     if (historyCount > VISIBLE_LINES) {
-        int barH  = max(4, (INPUT_Y - 1) * VISIBLE_LINES / historyCount);
+        int barH   = max(4, (INPUT_Y - 1) * VISIBLE_LINES / historyCount);
         int maxOff = historyCount - VISIBLE_LINES;
-        int barY  = (INPUT_Y - 1 - barH) * (maxOff - scrollOffset) / maxOff;
+        int barY   = (INPUT_Y - 1 - barH) * (maxOff - scrollOffset) / maxOff;
         tft.fillRect(SCREEN_W - 4, barY, 4, barH, COL_SCROLL);
     }
 }
@@ -153,13 +195,11 @@ char readKeyboard() {
     return key;
 }
 
-// Blocking single-line input shown on a clean screen
 String readLine(const String &prompt, bool mask = false) {
     String buf = "";
     tft.fillScreen(COL_BG);
     tft.setTextFont(1);
     tft.setTextColor(COL_PROMPT, COL_BG);
-    // Word-wrap the prompt if it's long
     if ((int)prompt.length() > CHARS_PER_LINE) {
         tft.drawString(prompt.substring(0, CHARS_PER_LINE), 2, 10);
         tft.drawString(prompt.substring(CHARS_PER_LINE), 2, 26);
@@ -172,7 +212,9 @@ String readLine(const String &prompt, bool mask = false) {
         tft.setTextColor(COL_INPUT, COL_BG);
         String masked = "";
         if (mask) for (int i = 0; i < (int)buf.length(); i++) masked += '*';
-        tft.drawString((mask ? masked : buf) + "_", 2, 44);
+        String show = (mask ? masked : buf) + "_";
+        if ((int)show.length() > 38) show = show.substring(show.length() - 38);
+        tft.drawString(show, 2, 44);
     };
     redraw();
 
@@ -188,7 +230,7 @@ String readLine(const String &prompt, bool mask = false) {
     return buf;
 }
 
-// ── NVS helpers ───────────────────────────────────────────────────────────────
+// ── NVS ───────────────────────────────────────────────────────────────────────
 void saveWiFiCreds(const String &ssid, const String &pass) {
     prefs.begin("wifi", false);
     prefs.putString("ssid", ssid);
@@ -204,21 +246,27 @@ bool loadWiFiCreds(String &ssid, String &pass) {
     return ssid.length() > 0;
 }
 
-void saveServerUrl(const String &url) {
+void saveApiConfig() {
     prefs.begin("cfg", false);
-    prefs.putString("url", url);
+    prefs.putString("type",  apiType);
+    prefs.putString("key",   apiKey);
+    prefs.putString("url",   apiUrl);
+    prefs.putString("model", apiModel);
     prefs.end();
 }
 
-bool loadServerUrl(String &url) {
+bool loadApiConfig() {
     prefs.begin("cfg", true);
-    url = prefs.getString("url", "");
+    apiType  = prefs.getString("type",  "");
+    apiKey   = prefs.getString("key",   "");
+    apiUrl   = prefs.getString("url",   "");
+    apiModel = prefs.getString("model", "");
     prefs.end();
-    return url.length() > 0;
+    return apiType.length() > 0 && apiKey.length() > 0;
 }
 
-// ── SD card credential loader ─────────────────────────────────────────────────
-bool loadCredsFromSD(String &ssid, String &pass) {
+// ── SD card loaders ───────────────────────────────────────────────────────────
+bool loadWiFiFromSD(String &ssid, String &pass) {
     if (!SD.begin(BOARD_SDCARD_CS)) return false;
     if (!SD.exists("/wifi.txt")) { SD.end(); return false; }
     File f = SD.open("/wifi.txt", FILE_READ);
@@ -231,6 +279,36 @@ bool loadCredsFromSD(String &ssid, String &pass) {
     return ssid.length() > 0;
 }
 
+bool loadConfigFromSD() {
+    if (!SD.begin(BOARD_SDCARD_CS)) return false;
+    if (!SD.exists("/config.txt")) { SD.end(); return false; }
+    File f = SD.open("/config.txt", FILE_READ);
+    if (!f) { SD.end(); return false; }
+    while (f.available()) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        int colon = line.indexOf(':');
+        if (colon < 0) continue;
+        String k = line.substring(0, colon);  k.trim(); k.toLowerCase();
+        String v = line.substring(colon + 1); v.trim();
+        if (k == "type")  apiType  = v;
+        if (k == "key")   apiKey   = v;
+        if (k == "url")   apiUrl   = v;
+        if (k == "model") apiModel = v;
+    }
+    f.close();
+    SD.remove("/config.txt");
+    SD.end();
+    if (apiType == "openai") {
+        if (apiUrl.length()   == 0) apiUrl   = "https://api.openai.com/v1";
+        if (apiModel.length() == 0) apiModel = "gpt-4o-mini";
+    } else if (apiType == "anthropic") {
+        apiUrl = "https://api.anthropic.com";
+        if (apiModel.length() == 0) apiModel = "claude-3-5-haiku-20241022";
+    }
+    return apiType.length() > 0 && apiKey.length() > 0;
+}
+
 // ── Setup flows ───────────────────────────────────────────────────────────────
 void setupWiFiCredentials() {
     String ssid, pass;
@@ -239,28 +317,45 @@ void setupWiFiCredentials() {
     tft.setTextColor(COL_PROMPT, COL_BG);
     tft.drawString("Checking SD for wifi.txt...", 2, 10);
     delay(1000);
-
-    if (loadCredsFromSD(ssid, pass)) {
+    if (loadWiFiFromSD(ssid, pass)) {
         tft.fillRect(0, 30, SCREEN_W, 20, COL_BG);
-        tft.setTextColor(COL_SIX, COL_BG);
+        tft.setTextColor(COL_AI, COL_BG);
         tft.drawString("Loaded from SD: " + ssid, 2, 32);
         delay(1500);
         saveWiFiCreds(ssid, pass);
     } else {
         ssid = readLine("Enter WiFi SSID:");
-        pass = readLine("Enter WiFi Password:");
+        pass = readLine("Enter WiFi Password:", true);
         saveWiFiCreds(ssid, pass);
     }
     tft.fillScreen(COL_BG);
 }
 
-void setupServerUrl() {
-    String url = readLine("Enter server URL:\n(e.g. https://abc123.ngrok-free.app)");
-    // Strip trailing slash
-    url.trim();
-    if (url.endsWith("/")) url.remove(url.length() - 1);
-    saveServerUrl(url);
-    serverBase = url;
+void setupApiConfig() {
+    String type = readLine("API type: openai or anthropic");
+    type.trim(); type.toLowerCase();
+    if (type != "openai" && type != "anthropic") type = "openai";
+
+    String key = readLine("API key:", true);
+
+    String url, model;
+    if (type == "openai") {
+        url = readLine("Base URL (blank=OpenAI default):");
+        url.trim();
+        if (url.endsWith("/")) url.remove(url.length() - 1);
+        if (url.length() == 0) url = "https://api.openai.com/v1";
+        model = readLine("Model (blank=gpt-4o-mini):");
+        model.trim();
+        if (model.length() == 0) model = "gpt-4o-mini";
+    } else {
+        url   = "https://api.anthropic.com";
+        model = readLine("Model (blank=claude-3-5-haiku-20241022):");
+        model.trim();
+        if (model.length() == 0) model = "claude-3-5-haiku-20241022";
+    }
+
+    apiType = type; apiKey = key; apiUrl = url; apiModel = model;
+    saveApiConfig();
     tft.fillScreen(COL_BG);
 }
 
@@ -278,7 +373,41 @@ bool connectWiFi() {
     return WiFi.status() == WL_CONNECTED;
 }
 
-// ── HTTP request (auto HTTP/HTTPS) ────────────────────────────────────────────
+// ── HTTP POST helper ──────────────────────────────────────────────────────────
+int doPost(const String &endpoint, const String &body,
+           const String &authHeader, const String &authValue,
+           const String &extraHeader, const String &extraValue,
+           String &responseOut) {
+    bool https = endpoint.startsWith("https://");
+    int  code  = -1;
+    if (https) {
+        WiFiClientSecure client;
+        client.setInsecure();
+        HTTPClient http;
+        http.begin(client, endpoint);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader(authHeader, authValue);
+        if (extraHeader.length() > 0) http.addHeader(extraHeader, extraValue);
+        http.addHeader("ngrok-skip-browser-warning", "true");
+        http.setTimeout(60000);
+        code = http.POST(body);
+        responseOut = http.getString();
+        http.end();
+    } else {
+        HTTPClient http;
+        http.begin(endpoint);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader(authHeader, authValue);
+        if (extraHeader.length() > 0) http.addHeader(extraHeader, extraValue);
+        http.setTimeout(60000);
+        code = http.POST(body);
+        responseOut = http.getString();
+        http.end();
+    }
+    return code;
+}
+
+// ── Send message ──────────────────────────────────────────────────────────────
 void sendMessage(const String &msg) {
     pushWrapped("YOU: ", msg, COL_YOU);
     pushLine("...", COL_SYS);
@@ -286,63 +415,76 @@ void sendMessage(const String &msg) {
     redrawInput();
 
     if (WiFi.status() != WL_CONNECTED) {
-        history[historyCount > 0 ? historyCount - 1 : 0] = { "ERR: WiFi not connected", COL_SYS };
-        redrawChat();
+        if (historyCount > 0 && history[historyCount-1].text == "...") historyCount--;
+        pushLine("ERR: WiFi not connected", COL_SYS);
+        scrollToBottom();
         return;
     }
-
-    if (serverBase.length() == 0) {
+    if (apiKey.length() == 0 || apiType.length() == 0) {
         if (historyCount > 0 && history[historyCount-1].text == "...") historyCount--;
-        pushLine("ERR: No URL set. Type seturl", COL_SYS);
+        pushLine("ERR: No API config. Type setapi", COL_SYS);
         scrollToBottom();
         return;
     }
 
-    String endpoint = serverBase + "/" + activeAgent + "/simple";
-    bool   useHttps = serverBase.startsWith("https://");
+    // Build request
+    JsonDocument reqDoc;
+    reqDoc["model"] = apiModel;
+    if (apiType == "anthropic") reqDoc["max_tokens"] = 1024;
+    JsonArray messages = reqDoc["messages"].to<JsonArray>();
+    for (int i = 0; i < ctxCount; i++) {
+        JsonObject m = messages.add<JsonObject>();
+        m["role"]    = convCtx[i].role;
+        m["content"] = convCtx[i].content;
+    }
+    JsonObject newMsg = messages.add<JsonObject>();
+    newMsg["role"]    = "user";
+    newMsg["content"] = msg;
 
-    StaticJsonDocument<256> req;
-    req["message"] = msg;
     String body;
-    serializeJson(req, body);
+    serializeJson(reqDoc, body);
 
-    int code = -1;
-    String raw = "";
-
-    if (useHttps) {
-        WiFiClientSecure client;
-        client.setInsecure();
-        HTTPClient http;
-        http.begin(client, endpoint);
-        http.addHeader("Content-Type", "application/json");
-        http.addHeader("ngrok-skip-browser-warning", "true");
-        http.setTimeout(60000);
-        code = http.POST(body);
-        if (code == 200) raw = http.getString();
-        http.end();
+    // Endpoint and auth
+    String endpoint, authHeader, authValue, extraHeader, extraValue;
+    if (apiType == "anthropic") {
+        endpoint    = "https://api.anthropic.com/v1/messages";
+        authHeader  = "x-api-key";
+        authValue   = apiKey;
+        extraHeader = "anthropic-version";
+        extraValue  = "2023-06-01";
     } else {
-        HTTPClient http;
-        http.begin(endpoint);
-        http.addHeader("Content-Type", "application/json");
-        http.setTimeout(60000);
-        code = http.POST(body);
-        if (code == 200) raw = http.getString();
-        http.end();
+        endpoint   = apiUrl + "/chat/completions";
+        authHeader = "Authorization";
+        authValue  = "Bearer " + apiKey;
     }
 
-    if (historyCount > 0 && history[historyCount - 1].text == "...") historyCount--;
+    String raw;
+    int code = doPost(endpoint, body, authHeader, authValue, extraHeader, extraValue, raw);
+
+    if (historyCount > 0 && history[historyCount-1].text == "...") historyCount--;
 
     if (code == 200) {
-        StaticJsonDocument<4096> res;
-        if (deserializeJson(res, raw)) {
+        JsonDocument resDoc;
+        DeserializationError err = deserializeJson(resDoc, raw);
+        if (err) {
             pushLine("ERR: bad JSON", COL_SYS);
         } else {
-            String   label = activeAgent == "nova" ? "NOVA: " : "SIX: ";
-            uint16_t col   = activeAgent == "nova" ? COL_NOVA : COL_SIX;
-            pushWrapped(label, res["response"].as<String>(), col);
+            String reply;
+            if (apiType == "anthropic") {
+                reply = resDoc["content"][0]["text"].as<String>();
+            } else {
+                reply = resDoc["choices"][0]["message"]["content"].as<String>();
+            }
+            if (reply.length() == 0) {
+                pushLine("ERR: empty response", COL_SYS);
+            } else {
+                ctxAddPair(msg, reply);
+                pushWrapped("AI: ", reply, COL_AI);
+            }
         }
     } else if (code > 0) {
         pushLine("ERR: HTTP " + String(code), COL_SYS);
+        if (raw.length() > 0) pushWrapped("  ", raw.substring(0, 80), COL_SYS);
     } else {
         pushLine("ERR: connection failed (" + String(code) + ")", COL_SYS);
     }
@@ -373,7 +515,7 @@ void setup() {
 
     // Splash
     tft.setTextFont(2);
-    tft.setTextColor(COL_SIX, COL_BG);
+    tft.setTextColor(COL_AI, COL_BG);
     tft.drawCentreString("MAYDAY TERMINAL", SCREEN_W / 2, 75, 2);
     tft.setTextFont(1);
     tft.setTextColor(COL_SYS, COL_BG);
@@ -385,25 +527,30 @@ void setup() {
     tft.drawFastHLine(0, INPUT_Y - 1, SCREEN_W, COL_SYS);
     redrawInput();
 
-    // Connect WiFi
+    // WiFi
     if (connectWiFi()) {
         pushLine("WiFi: " + WiFi.localIP().toString(), COL_SYS);
     } else {
         pushLine("WiFi failed. Type setwifi.", COL_SYS);
     }
 
-    // Load or prompt for server URL
-    if (!loadServerUrl(serverBase)) {
-        pushLine("No server URL set.", COL_SYS);
+    // API config — SD first, then NVS, then prompt
+    pushLine("Checking SD for config.txt...", COL_SYS);
+    redrawChat();
+    if (loadConfigFromSD()) {
+        saveApiConfig();
+        pushLine("API loaded from SD: " + apiType, COL_SYS);
+    } else if (!loadApiConfig()) {
+        pushLine("No API config found.", COL_SYS);
         redrawChat();
-        setupServerUrl();
+        setupApiConfig();
         tft.drawFastHLine(0, INPUT_Y - 1, SCREEN_W, COL_SYS);
-        pushLine("URL saved: " + serverBase, COL_SYS);
+        pushLine("API saved: " + apiType + " / " + apiModel, COL_SYS);
     } else {
-        pushLine("Server: " + serverBase, COL_SYS);
+        pushLine("API: " + apiType + " / " + apiModel, COL_SYS);
     }
 
-    pushLine("six/nova=switch  setwifi  seturl", COL_SYS);
+    pushLine("setwifi  setapi  clear", COL_SYS);
     redrawChat();
     redrawInput();
 }
@@ -427,13 +574,7 @@ void loop() {
         inputBuf = "";
         redrawInput();
 
-        if (msg == "six" || msg == "nova") {
-            activeAgent = msg;
-            String label = activeAgent == "nova" ? "NOVA: red" : "SIX: purple";
-            pushLine("Switched to " + label, COL_SYS);
-            redrawChat();
-            redrawInput();
-        } else if (msg == "setwifi") {
+        if (msg == "setwifi") {
             setupWiFiCredentials();
             tft.fillScreen(COL_BG);
             tft.drawFastHLine(0, INPUT_Y - 1, SCREEN_W, COL_SYS);
@@ -442,11 +583,17 @@ void loop() {
             pushLine(connectWiFi() ? "WiFi: " + WiFi.localIP().toString() : "WiFi failed.", COL_SYS);
             redrawChat();
             redrawInput();
-        } else if (msg == "seturl") {
-            setupServerUrl();
+        } else if (msg == "setapi") {
+            setupApiConfig();
             tft.fillScreen(COL_BG);
             tft.drawFastHLine(0, INPUT_Y - 1, SCREEN_W, COL_SYS);
-            pushLine("URL: " + serverBase, COL_SYS);
+            ctxClear();
+            pushLine("API: " + apiType + " / " + apiModel, COL_SYS);
+            redrawChat();
+            redrawInput();
+        } else if (msg == "clear") {
+            historyCount = 0; scrollOffset = 0;
+            ctxClear();
             redrawChat();
             redrawInput();
         } else if (msg.length() > 0) {
