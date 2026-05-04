@@ -72,8 +72,8 @@
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 #define COL_BG       TFT_BLACK
-#define COL_YOU      0x07FF   // cyan
-#define COL_AI       0xC81F   // purple
+#define COL_YOU      0x041F   // cyan blue
+#define COL_AI       0x07F0   // cyan green
 #define COL_SYS      0x7BEF   // light grey
 #define COL_INPUT_BG 0x1082   // very dark grey
 #define COL_INPUT    TFT_WHITE
@@ -119,6 +119,8 @@ int    scrollOffset = 0;
 String inputBuf     = "";
 
 // ── Backlight ─────────────────────────────────────────────────────────────────
+uint8_t brightLevel = 16;
+
 void setBrightness(uint8_t val) {
     static uint8_t level = 0;
     const  uint8_t steps = 16;
@@ -127,6 +129,20 @@ void setBrightness(uint8_t val) {
     int num = (steps + (steps - val) - (steps - level)) % steps;
     for (int i = 0; i < num; i++) { digitalWrite(BOARD_BL_PIN, 0); digitalWrite(BOARD_BL_PIN, 1); }
     level = val;
+}
+
+void brightnessUp() {
+    if (brightLevel < 16) { brightLevel += 2; if (brightLevel > 16) brightLevel = 16; }
+    setBrightness(brightLevel);
+    pushLine("Brightness: " + String(brightLevel) + "/16", COL_SYS);
+    scrollToBottom();
+}
+
+void brightnessDown() {
+    if (brightLevel > 2) { brightLevel -= 2; }
+    setBrightness(brightLevel);
+    pushLine("Brightness: " + String(brightLevel) + "/16", COL_SYS);
+    scrollToBottom();
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -550,7 +566,7 @@ void setup() {
         pushLine("API: " + apiType + " / " + apiModel, COL_SYS);
     }
 
-    pushLine("setwifi  setapi  clear", COL_SYS);
+    pushLine("setwifi  setapi  clear  b+  b-", COL_SYS);
     redrawChat();
     redrawInput();
 }
@@ -574,7 +590,15 @@ void loop() {
         inputBuf = "";
         redrawInput();
 
-        if (msg == "setwifi") {
+        if (msg == "b+") {
+            brightnessUp();
+            redrawChat();
+            redrawInput();
+        } else if (msg == "b-") {
+            brightnessDown();
+            redrawChat();
+            redrawInput();
+        } else if (msg == "setwifi") {
             setupWiFiCredentials();
             tft.fillScreen(COL_BG);
             tft.drawFastHLine(0, INPUT_Y - 1, SCREEN_W, COL_SYS);
