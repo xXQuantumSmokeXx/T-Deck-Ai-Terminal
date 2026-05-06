@@ -64,11 +64,11 @@
 // ── Display ───────────────────────────────────────────────────────────────────
 #define SCREEN_W        320
 #define SCREEN_H        240
-#define LINE_H           17
-#define VISIBLE_LINES    12
+#define LINE_H           20
+#define VISIBLE_LINES    10
 #define HISTORY_SIZE    200
 #define INPUT_Y        (SCREEN_H - 22)
-#define CHARS_PER_LINE   52
+#define CHARS_PER_LINE   28
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 #define COL_BG       TFT_BLACK
@@ -153,7 +153,7 @@ void brightnessDown() {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 void redrawChat() {
     tft.fillRect(0, 0, SCREEN_W - 4, INPUT_Y - 1, COL_BG);
-    tft.setTextFont(1);
+    tft.setTextFont(2);
     tft.setTextSize(1);
     int lastLine  = historyCount - 1 - scrollOffset;
     int firstLine = lastLine - VISIBLE_LINES + 1;
@@ -174,11 +174,11 @@ void redrawChat() {
 
 void redrawInput() {
     tft.fillRect(0, INPUT_Y, SCREEN_W, SCREEN_H - INPUT_Y, COL_INPUT_BG);
-    tft.setTextFont(1);
+    tft.setTextFont(2);
     tft.setTextSize(1);
     tft.setTextColor(COL_INPUT, COL_INPUT_BG);
     String display = "> " + inputBuf + "_";
-    if (display.length() > 40) display = display.substring(display.length() - 40);
+    if (display.length() > 28) display = display.substring(display.length() - 28);
     tft.drawString(display, 2, INPUT_Y + 4);
 }
 
@@ -193,14 +193,27 @@ void pushLine(const String &text, uint16_t color) {
 }
 
 void pushWrapped(const String &prefix, const String &text, uint16_t color) {
+    const int maxW = SCREEN_W - 8;
+    tft.setTextFont(2);
     String full = prefix + text;
     while (full.length() > 0) {
-        if ((int)full.length() <= CHARS_PER_LINE) { pushLine(full, color); break; }
-        int cut = CHARS_PER_LINE;
-        while (cut > 1 && full[cut] != ' ') cut--;
-        if (cut <= 1) cut = CHARS_PER_LINE;
+        if (tft.textWidth(full) <= maxW) { pushLine(full, color); break; }
+        // Binary search for the character count that fills maxW pixels
+        int lo = 1, hi = full.length();
+        while (lo < hi) {
+            int mid = (lo + hi + 1) / 2;
+            if (tft.textWidth(full.substring(0, mid)) <= maxW) lo = mid;
+            else hi = mid - 1;
+        }
+        // Back up to the nearest word boundary
+        int cut = lo;
+        int space = cut;
+        while (space > 1 && full[space] != ' ') space--;
+        if (space > 1) cut = space;
         pushLine(full.substring(0, cut), color);
-        full = "  " + full.substring(cut + (full[cut] == ' ' ? 1 : 0));
+        String rest = full.substring(cut);
+        if (rest.length() > 0 && rest[0] == ' ') rest = rest.substring(1);
+        full = "  " + rest;
     }
 }
 
@@ -221,9 +234,9 @@ String readLine(const String &prompt, bool mask = false) {
     tft.fillScreen(COL_BG);
     tft.setTextFont(1);
     tft.setTextColor(COL_PROMPT, COL_BG);
-    if ((int)prompt.length() > CHARS_PER_LINE) {
-        tft.drawString(prompt.substring(0, CHARS_PER_LINE), 2, 10);
-        tft.drawString(prompt.substring(CHARS_PER_LINE), 2, 26);
+    if ((int)prompt.length() > 52) {
+        tft.drawString(prompt.substring(0, 52), 2, 10);
+        tft.drawString(prompt.substring(52), 2, 26);
     } else {
         tft.drawString(prompt, 2, 10);
     }
