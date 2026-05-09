@@ -15,10 +15,10 @@ static const TileDef TILES[TILE_COUNT] = {
     { "WEATHER",  COL_CYAN    },
     { "SOLAR",    COL_AMBER   },
     { "LOG",      COL_CYAN    },
-    { "BTC",      COL_GOLD    },
+    { "CRYPTO",   COL_CYAN    },
     { "FIRES",    COL_RED     },
     { "QUAKES",   COL_GREEN   },
-    { "SYSTEM",   COL_BLUE    },
+    { "SYSTEM",   COL_CYAN    },
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ static void drawTileIcon(TFT_eSPI &t, int idx, int cx, int cy) {
         break;
     }
 
-    case 4: { // BTC — coin with B
+    case 4: { // CRYPTO — coin with B
         t.drawCircle(cx, cy, 13, C);
         t.drawCircle(cx, cy, 12, C);   // double ring
         // B vertical stroke
@@ -178,7 +178,7 @@ static void drawTile(TFT_eSPI &tft, int idx, bool selected) {
 
     // Label
     tft.setTextFont(FONT_SMALL);
-    tft.setTextColor(selected ? COL_WHITE : COL_CYAN, COL_BG);
+    tft.setTextColor(COL_CYAN, COL_BG);
     int labelW = tft.textWidth(TILES[idx].label);
     tft.drawString(TILES[idx].label, x + (w - labelW) / 2, y + h - 18);
 

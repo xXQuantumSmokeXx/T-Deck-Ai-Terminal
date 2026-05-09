@@ -51,12 +51,12 @@ static String btcReadLine(const char *prompt) {
     String buf = "";
     s_tft->fillScreen(COL_BG);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_ORANGE, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString(prompt, 2, 10);
     auto redraw = [&]() {
         s_tft->fillRect(0, 26, SCREEN_W, 16, COL_BG);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_WHITE, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(buf + "_", 2, 28);
     };
     redraw();
@@ -342,7 +342,7 @@ static void drawSparkline(int x, int y, int w, int h, const CoinData &c) {
         px = cx; py = cy;
     }
     // Baseline
-    s_tft->drawFastHLine(x, y + h, w, COL_GREY_DIM);
+    s_tft->drawFastHLine(x, y + h, w, COL_CYAN);
 }
 
 // ── Screen drawing ────────────────────────────────────────────────────────────
@@ -386,7 +386,7 @@ static void drawBtcScreen() {
         s_tft->setTextColor(s_fromCache ? COL_AMBER : COL_CYAN, COL_BG);
         s_tft->drawString(syncBuf, SCREEN_W - sw - 4, TOPBAR_H + 3);
     }
-    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
 
     int contentY = TOPBAR_H + STATUSBAR_H;
 
@@ -418,7 +418,7 @@ static void drawBtcScreen() {
             int ry = contentY + i * rowHCompact;
             const CoinData &c = s_coins[i];
 
-            if (i > 0) s_tft->drawFastHLine(0, ry, SCREEN_W, COL_GREY_DIM);
+            if (i > 0) s_tft->drawFastHLine(0, ry, SCREEN_W, COL_CYAN);
 
             if (!c.valid) {
                 s_tft->setTextFont(FONT_SMALL);
@@ -440,7 +440,7 @@ static void drawBtcScreen() {
             s_tft->setTextColor(COL_CYAN, COL_BG);
             s_tft->drawString(c.symbol, 4, ry + 4);
 
-            s_tft->setTextColor(COL_WHITE, COL_BG);
+            s_tft->setTextColor(COL_CYAN, COL_BG);
             s_tft->drawString(priceBuf, 70, ry + 4);
 
             s_tft->setTextFont(FONT_SMALL);
@@ -463,7 +463,7 @@ static void drawBtcScreen() {
         int ry = contentY + i * rowH;
         const CoinData &c = s_coins[i];
 
-        if (i > 0) s_tft->drawFastHLine(0, ry, SCREEN_W, COL_GREY_DIM);
+        if (i > 0) s_tft->drawFastHLine(0, ry, SCREEN_W, COL_CYAN);
 
         if (!c.valid) {
             s_tft->setTextFont(FONT_SMALL);
@@ -492,7 +492,7 @@ static void drawBtcScreen() {
         char priceBuf[20];
         formatPrice(c.priceUsd, priceBuf, sizeof(priceBuf));
         s_tft->setTextFont(FONT_LARGE);
-        s_tft->setTextColor(COL_WHITE, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(priceBuf, 4, ry + 22);
 
         const int changeLabelX = 126;
@@ -520,7 +520,7 @@ static void drawBtcScreen() {
         s_tft->drawString("7D", changeLabelX, ry + 70);
 
         // ── Divider between text and sparkline ────────────────────────────────
-        s_tft->drawFastVLine(170, ry + 2, rowH - 4, COL_GREY_DIM);
+        s_tft->drawFastVLine(170, ry + 2, rowH - 4, COL_CYAN);
 
         // ── Right: 7-day sparkline (x = 174..315) ────────────────────────────
         int sx = 174, sy = ry + 8;

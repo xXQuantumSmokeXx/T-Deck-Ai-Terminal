@@ -60,7 +60,7 @@ inline void drawStatusBar(TFT_eSPI &tft, bool wifiOk, bool loraOk, const char *c
 
     (void)kp;  // Kp removed from home status bar
 
-    tft.drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
+    tft.drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
 }
 
 // ── Bottom bar ────────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     tft.setTextColor(COL_CYAN, COL_BG);
     if (left && left[0]) tft.drawString(left, 4, y + 3);
     else drawFooterName(tft, y);
-    drawBatteryIndicator(tft, SCREEN_W - 58, y + 1);
+    drawBatteryIndicator(tft, SCREEN_W - 50, y + 1);
 }
 
 // ── Status dot ────────────────────────────────────────────────────────────────

@@ -113,7 +113,7 @@ static void redrawChatArea() {
         int barH   = max(4, (CHAT_INPUT_Y - top - 1) * CHAT_VISIBLE / s_histCount);
         int maxOff = s_histCount - CHAT_VISIBLE;
         int barY   = top + (CHAT_INPUT_Y - top - 1 - barH) * (maxOff - s_scrollOff) / maxOff;
-        s_tft->fillRect(SCREEN_W - 4, barY, 4, barH, COL_GREY_DIM);
+        s_tft->fillRect(SCREEN_W - 4, barY, 4, barH, COL_CYAN);
     }
 }
 
@@ -121,12 +121,12 @@ static void redrawInput() {
     PersonaDef *p = personaMgrGet();
     s_tft->fillRect(0, CHAT_INPUT_Y, SCREEN_W, SCREEN_H - CHAT_INPUT_Y, COL_INPUT_BG);
     s_tft->setTextFont(FONT_MED);
-    s_tft->setTextColor(COL_WHITE, COL_INPUT_BG);
+    s_tft->setTextColor(COL_CYAN, COL_INPUT_BG);
     String display = "> " + s_inputBuf + "_";
     if (display.length() > 28) display = display.substring(display.length() - 28);
     s_tft->drawString(display, 2, CHAT_INPUT_Y + 4);
     // Accent line above input bar
-    s_tft->drawFastHLine(0, CHAT_INPUT_Y - 1, SCREEN_W, p->color);
+    s_tft->drawFastHLine(0, CHAT_INPUT_Y - 1, SCREEN_W, COL_CYAN);
 }
 
 static void pushLine(const String &text, uint16_t color) {
@@ -192,7 +192,7 @@ static String readLine(const String &prompt, bool mask = false) {
     String buf = "";
     s_tft->fillScreen(COL_BG);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_ORANGE, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     if ((int)prompt.length() > 52) {
         s_tft->drawString(prompt.substring(0, 52), 2, 10);
         s_tft->drawString(prompt.substring(52), 2, 26);
@@ -201,7 +201,7 @@ static String readLine(const String &prompt, bool mask = false) {
     }
     auto redrawRL = [&]() {
         s_tft->fillRect(0, 42, SCREEN_W, 20, COL_BG);
-        s_tft->setTextColor(COL_WHITE, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         String m = mask ? String(buf.length(), '*') : buf;
         s_tft->drawString(m + "_", 2, 44);
     };
@@ -229,7 +229,7 @@ static void drawChatTopbar() {
     } else {
         snprintf(title, sizeof(title), ">> %s", p->name);
     }
-    drawTopbar(*s_tft, title, "Q=home", p->color);
+    drawTopbar(*s_tft, title, "Q=home", COL_CYAN);
     drawStatusBar(*s_tft, WiFi.isConnected(), false, p->title[0] ? p->title : p->name, 0);
 }
 
@@ -299,7 +299,7 @@ static void sendMessage(const String &msg) {
         } else {
             String reply = stripMarkdown(res["response"].as<String>());
             ctxAdd(msg, reply);
-            pushWrapped(String(p->name) + ": ", reply, p->color);
+            pushWrapped(String(p->name) + ": ", reply, COL_CYAN);
         }
     } else {
         pushLine(code > 0 ? "ERR: HTTP " + String(code) : "ERR: connection failed", COL_SYS);
@@ -328,8 +328,8 @@ static void switchPersona() {
         s_tft->fillScreen(COL_BG);
         drawChatTopbar();
         PersonaDef *p = personaMgrGet();
-        pushLine(">> " + String(p->name), p->color);
-        if (p->title[0]) pushLine(p->title, p->color);
+        pushLine(">> " + String(p->name), COL_CYAN);
+        if (p->title[0]) pushLine(p->title, COL_CYAN);
         redrawChatArea();
         redrawInput();
     }
@@ -351,7 +351,7 @@ void chatInit(TFT_eSPI &tft) {
     redrawInput();
 
     PersonaDef *p = personaMgrGet();
-    pushLine(">> " + String(p->name) + (p->title[0] ? " - " + String(p->title) : ""), p->color);
+    pushLine(">> " + String(p->name) + (p->title[0] ? " - " + String(p->title) : ""), COL_CYAN);
     pushLine("seturl setwifi persona clear b+ b-", COL_SYS);
     redrawChatArea();
     redrawInput();

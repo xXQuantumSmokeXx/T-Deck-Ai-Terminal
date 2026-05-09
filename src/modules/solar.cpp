@@ -654,7 +654,7 @@ static void drawSolarScreen() {
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
-        drawBatteryIndicator(*s_tft, SCREEN_W - 58, bottomY + 1);
+        drawBatteryIndicator(*s_tft, SCREEN_W - 50, bottomY + 1);
     }
 }
 

@@ -167,7 +167,7 @@ static uint16_t rssiColor(int rssi) {
 static void drawBar(int x, int y, int w, int h, float pct, uint16_t col) {
     if (pct < 0.0f) pct = 0.0f;
     if (pct > 1.0f) pct = 1.0f;
-    s_tft->drawRect(x, y, w, h, COL_GREY_DIM);
+    s_tft->drawRect(x, y, w, h, COL_CYAN);
     int filled = (int)(pct * (w - 2));
     if (filled > 0) s_tft->fillRect(x + 1, y + 1, filled, h - 2, col);
 }
@@ -187,7 +187,7 @@ static void drawValue(int x, int y, const char *val, uint16_t col = COL_WHITE) {
 
 static void divider(int &y) {
     y += 12;
-    s_tft->drawFastHLine(0, y, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, y, SCREEN_W, COL_CYAN);
     y += 4;
 }
 
@@ -206,7 +206,7 @@ static void drawSysinfoScreen() {
     const char *bdate = __DATE__;
     int bdw = s_tft->textWidth(bdate);
     s_tft->drawString(bdate, SCREEN_W - bdw - 4, TOPBAR_H + 3);
-    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
 
     int y = TOPBAR_H + STATUSBAR_H + 4;
 
