@@ -474,7 +474,6 @@ static void drawWeatherScreen() {
         s_tft->drawString(alertText, (SCREEN_W - aw) / 2, ya + 3);
     } else {
         s_tft->drawFastHLine(0, ya, SCREEN_W, COL_CYAN);
-        drawFooterName(*s_tft, ya);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh  L=location", SCREEN_W / 2, ya + 3, FONT_SMALL);

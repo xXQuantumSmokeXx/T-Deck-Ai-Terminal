@@ -197,7 +197,7 @@ static bool fetchKpForecast() {
 static bool fetchSolarWind1h() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
-    http.begin(client, "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-hour.json");
+    http.begin(client, "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json");
     http.setTimeout(10000);
     http.addHeader("User-Agent", "T-Deck-AI/1.0");
     if (http.GET() != 200) { http.end(); return false; }
@@ -220,7 +220,7 @@ static bool fetchSolarWind1h() {
 static bool fetchSolarBz1h() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
-    http.begin(client, "https://services.swpc.noaa.gov/products/solar-wind/mag-1-hour.json");
+    http.begin(client, "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json");
     http.setTimeout(10000);
     http.addHeader("User-Agent", "T-Deck-AI/1.0");
     if (http.GET() != 200) { http.end(); return false; }
@@ -241,7 +241,7 @@ static bool fetchSolarBz1h() {
 static bool fetchXray1Min() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
-    http.begin(client, "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-minute.json");
+    http.begin(client, "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json");
     http.setTimeout(12000);
     http.addHeader("User-Agent", "T-Deck-AI/1.0");
     if (http.GET() != 200) { http.end(); return false; }
@@ -281,8 +281,10 @@ static bool fetchXray1Min() {
     for (char *p = tail; (p = strstr(p, "0.1-0.8nm")) != nullptr; p++) pos = p;
     if (!pos) return false;
     for (char *fp = pos; fp > tail; fp--) {
-        if (strncmp(fp, "\"flux\":", 7) == 0) {
-            s_sol.xrayFlux = atof(fp + 7);
+        if (strncmp(fp, "\"flux\"", 6) == 0) {
+            char *colon = strchr(fp, ':');
+            if (!colon) continue;
+            s_sol.xrayFlux = atof(colon + 1);
             fluxToClass(s_sol.xrayFlux, s_sol.xrayClass, sizeof(s_sol.xrayClass));
             return true;
         }
@@ -292,19 +294,10 @@ static bool fetchXray1Min() {
 
 // ── NASA DONKI — solar flares (last 3 days) ───────────────────────────────────
 static bool fetchSolarFlare() {
-    char startDate[12], endDate[12];
-    getDateStrUTC(-3, startDate, sizeof(startDate));
-    getDateStrUTC(0,  endDate,   sizeof(endDate));
-
-    char url[200];
-    snprintf(url, sizeof(url),
-        "https://api.nasa.gov/DONKI/FLR?startDate=%s&endDate=%s&api_key=%s",
-        startDate, endDate, donkiApiKey().c_str());
-
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
-    http.begin(client, url);
-    http.setTimeout(12000);
+    http.begin(client, "https://services.swpc.noaa.gov/json/goes/primary/xray-flares-latest.json");
+    http.setTimeout(8000);
     http.addHeader("User-Agent", "T-Deck-AI/1.0");
     if (http.GET() != 200) { http.end(); return false; }
     String json = http.getString();
@@ -313,27 +306,20 @@ static bool fetchSolarFlare() {
     JsonDocument doc;
     if (deserializeJson(doc, json)) return false;
     JsonArray arr = doc.as<JsonArray>();
-
     if (arr.size() == 0) {
         strlcpy(s_sol.flareClass, "NONE", sizeof(s_sol.flareClass));
-        strlcpy(s_sol.flareTime,  "---",  sizeof(s_sol.flareTime));
+        strlcpy(s_sol.flareTime, "---", sizeof(s_sol.flareTime));
         return true;
     }
 
-    int last = arr.size() - 1;
-    const char *cls  = arr[last]["classType"] | "---";
-    const char *peak = arr[last]["peakTime"]  | "";
+    JsonObject flare = arr[0];
+    const char *cls = flare["max_class"] | flare["current_class"] | "---";
+    const char *peak = flare["max_time"] | flare["time_tag"] | "";
     strlcpy(s_sol.flareClass, cls, sizeof(s_sol.flareClass));
-
-    // "2025-05-08 03:52Z" → "05-08 03:52"
-    if (strlen(peak) >= 16) {
-        snprintf(s_sol.flareTime, sizeof(s_sol.flareTime), "%.5s %.5s", peak + 5, peak + 11);
-    } else {
-        strlcpy(s_sol.flareTime, "---", sizeof(s_sol.flareTime));
-    }
+    if (strlen(peak) >= 16) snprintf(s_sol.flareTime, sizeof(s_sol.flareTime), "%.5s %.5s", peak + 5, peak + 11);
+    else strlcpy(s_sol.flareTime, "---", sizeof(s_sol.flareTime));
     return true;
 }
-
 // ── NASA DONKI — CME (last 4 days) ───────────────────────────────────────────
 static bool fetchSolarCME() {
     char startDate[12], endDate[12];
@@ -380,7 +366,7 @@ static bool fetchSolarCME() {
     if (strlen(startTime) >= 16) {
         snprintf(s_sol.cmeTime, sizeof(s_sol.cmeTime), "%.5s %.5s", startTime + 5, startTime + 11);
     } else {
-        strlcpy(s_sol.cmeTime, "---", sizeof(s_sol.cmeTime));
+        strlcpy(s_sol.cmeTime, "NONE", sizeof(s_sol.cmeTime));
     }
     return true;
 }
@@ -391,10 +377,10 @@ static void fetchAllData() {
     s_sol.windSpeedKms = 0; s_sol.bzNT = 0;
     s_sol.densityPcc = 0;   s_sol.xrayFlux = 0;
     strlcpy(s_sol.xrayClass,  "N/A",  sizeof(s_sol.xrayClass));
-    strlcpy(s_sol.flareClass, "---",  sizeof(s_sol.flareClass));
+    strlcpy(s_sol.flareClass, "NONE", sizeof(s_sol.flareClass));
     strlcpy(s_sol.flareTime,  "---",  sizeof(s_sol.flareTime));
     s_sol.cmeSpeedKms = 0;
-    strlcpy(s_sol.cmeTime, "---", sizeof(s_sol.cmeTime));
+    strlcpy(s_sol.cmeTime, "NONE", sizeof(s_sol.cmeTime));
 
     if (!WiFi.isConnected()) return;
 
@@ -450,7 +436,7 @@ static bool loadFromCache() {
     strlcpy(s_sol.xrayClass, xray.isEmpty() ? "---" : xray.c_str(), sizeof(s_sol.xrayClass));
 
     String flare = nvsGetString("sol_flare");
-    strlcpy(s_sol.flareClass, flare.isEmpty() ? "---" : flare.c_str(), sizeof(s_sol.flareClass));
+    strlcpy(s_sol.flareClass, flare.isEmpty() ? "NONE" : flare.c_str(), sizeof(s_sol.flareClass));
 
     String flareT = nvsGetString("sol_flaret");
     strlcpy(s_sol.flareTime, flareT.isEmpty() ? "---" : flareT.c_str(), sizeof(s_sol.flareTime));
@@ -458,7 +444,7 @@ static bool loadFromCache() {
     s_sol.cmeSpeedKms = nvsGetInt("sol_cme_spd", 0);
 
     String cmeT = nvsGetString("sol_cmet");
-    strlcpy(s_sol.cmeTime, cmeT.isEmpty() ? "---" : cmeT.c_str(), sizeof(s_sol.cmeTime));
+    strlcpy(s_sol.cmeTime, cmeT.isEmpty() ? "NONE" : cmeT.c_str(), sizeof(s_sol.cmeTime));
 
     // History/forecast not cached — leave zeroed
     s_sol.valid     = true;
@@ -570,14 +556,14 @@ static void drawSolarScreen() {
     }
 
     // ── 24h Kp bar chart ─────────────────────────────────────────────────────
-    int chartY = cy + 58;
+    int chartY = cy + 56;
     s_tft->drawFastHLine(0, chartY - 2, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("24H Kp", 4, chartY);
 
     int barAreaY = chartY + 10;
-    int barMaxH  = 34;
+    int barMaxH  = 24;
     int barW     = 35;
     int barGap   = 3;
     int barStartX = (SCREEN_W - 8 * (barW + barGap) + barGap) / 2;
@@ -665,7 +651,6 @@ static void drawSolarScreen() {
         s_tft->drawCentreString("Bz SOUTHWARD - LoRa IMPACT POSSIBLE", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     } else {
         s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_CYAN);
-        drawFooterName(*s_tft, bottomY);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
@@ -678,9 +663,9 @@ void solarInit(TFT_eSPI &tft) {
     s_tft = &tft;
     memset(&s_sol, 0, sizeof(s_sol));
     strlcpy(s_sol.xrayClass,  "N/A", sizeof(s_sol.xrayClass));
-    strlcpy(s_sol.flareClass, "---", sizeof(s_sol.flareClass));
+    strlcpy(s_sol.flareClass, "NONE", sizeof(s_sol.flareClass));
     strlcpy(s_sol.flareTime,  "---", sizeof(s_sol.flareTime));
-    strlcpy(s_sol.cmeTime,    "---", sizeof(s_sol.cmeTime));
+    strlcpy(s_sol.cmeTime,    "NONE", sizeof(s_sol.cmeTime));
 
     // Show loading indicator instead of NO DATA while fetching
     tft.fillScreen(COL_BG);

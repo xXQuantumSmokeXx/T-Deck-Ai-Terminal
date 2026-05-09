@@ -101,7 +101,7 @@ inline void drawBatteryIndicator(TFT_eSPI &tft, int x, int y, uint16_t fg = COL_
     char buf[6];
     if (pct < 0) strlcpy(buf, "--%", sizeof(buf));
     else snprintf(buf, sizeof(buf), "%d%%", pct);
-    tft.drawString(buf, x, y + 3);
+    tft.drawString(buf, x, y + 5);
 
     int iconX = x + 28;
     int iconY = y + 4;
