@@ -258,7 +258,8 @@ static void drawQuakesScreen() {
 
     int by = SCREEN_H - BOTTOMBAR_H;
     s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
-    s_tft->drawFastHLine(0, by, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, by, SCREEN_W, COL_CYAN);
+    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);
@@ -307,7 +308,8 @@ static void drawFiresScreen() {
 
     int by = SCREEN_H - BOTTOMBAR_H;
     s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
-    s_tft->drawFastHLine(0, by, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, by, SCREEN_W, COL_CYAN);
+    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);

@@ -651,6 +651,7 @@ static void drawSolarScreen() {
         s_tft->drawCentreString("Bz SOUTHWARD - LoRa IMPACT POSSIBLE", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     } else {
         s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_CYAN);
+        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);

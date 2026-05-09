@@ -144,6 +144,7 @@ inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     int y = SCREEN_H - BOTTOMBAR_H;
     tft.fillRect(0, y, SCREEN_W, BOTTOMBAR_H, COL_BG);
     tft.drawFastHLine(0, y, SCREEN_W, COL_CYAN);
+    tft.drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(COL_CYAN, COL_BG);
     if (left && left[0]) tft.drawString(left, 4, y + 3);
