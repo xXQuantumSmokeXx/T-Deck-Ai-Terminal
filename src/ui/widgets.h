@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include "theme.h"
+#include "../config/nvs_config.h"
 
 // ── Corner brackets (6px L-shape) ────────────────────────────────────────────
 inline void drawCornerBrackets(TFT_eSPI &tft, int x, int y, int w, int h, uint16_t col, int len = 6) {
@@ -97,15 +98,32 @@ inline void drawBatteryIndicator(TFT_eSPI &tft, int x, int y, uint16_t fg = COL_
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(fg, bg);
 
-    tft.drawRect(x, y + 3, 21, 10, fg);
-    tft.fillRect(x + 21, y + 6, 2, 4, fg);
-    int fillW = pct < 0 ? 0 : (pct * 17) / 100;
-    if (fillW > 0) tft.fillRect(x + 2, y + 5, fillW, 6, fg);
+    char buf[6];
+    if (pct < 0) strlcpy(buf, "--%", sizeof(buf));
+    else snprintf(buf, sizeof(buf), "%d%%", pct);
+    tft.drawString(buf, x, y + 3);
 
-    char buf[5];
-    if (pct < 0) strlcpy(buf, "--", sizeof(buf));
-    else snprintf(buf, sizeof(buf), "%d", pct);
-    tft.drawString(buf, x + 26, y + 3);
+    int iconX = x + 28;
+    int iconY = y + 4;
+    tft.drawRect(iconX, iconY, 17, 9, fg);
+    tft.drawFastVLine(iconX + 17, iconY + 3, 3, fg);
+    int fillW = pct < 0 ? 0 : (pct * 13) / 100;
+    if (fillW > 0) tft.fillRect(iconX + 2, iconY + 2, fillW, 5, fg);
+}
+
+inline String footerDisplayName() {
+    String name = nvsGetString("display_name", "Commander Smoke");
+    name.trim();
+    if (name.isEmpty()) name = "Commander Smoke";
+    if (name.length() > 18) name = name.substring(0, 18);
+    return name;
+}
+
+inline void drawFooterName(TFT_eSPI &tft, int y, uint16_t fg = COL_CYAN, uint16_t bg = COL_BG) {
+    String name = footerDisplayName();
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(fg, bg);
+    tft.drawString(name, 4, y + 3);
 }
 inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     int y = SCREEN_H - BOTTOMBAR_H;
@@ -114,7 +132,8 @@ inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(COL_CYAN, COL_BG);
     if (left && left[0]) tft.drawString(left, 4, y + 3);
-    drawBatteryIndicator(tft, SCREEN_W - 48, y + 1);
+    else drawFooterName(tft, y);
+    drawBatteryIndicator(tft, SCREEN_W - 58, y + 1);
 }
 
 // ── Status dot ────────────────────────────────────────────────────────────────

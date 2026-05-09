@@ -35,10 +35,13 @@ struct SysInfo {
     char     serverUrl[48];
     int      personaSlot;
     int      brightness;
+    char     displayName[24];
 };
 
 static SysInfo   s_info;
 static TFT_eSPI *s_tft = nullptr;
+static void gatherData();
+static void drawSysinfoScreen();
 
 static void applyBrightness(int level16) {
     if (level16 < 1) level16 = 1;
@@ -56,6 +59,39 @@ static char readKeyboard() {
     return key;
 }
 
+static String sysReadLine(const String &prompt, const String &initial = "") {
+    String buf = initial;
+    s_tft->fillScreen(COL_BG);
+    drawTopbar(*s_tft, "< SYSTEM | EDIT", "", COL_CYAN);
+    s_tft->setTextFont(FONT_SMALL);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
+    s_tft->drawString(prompt, 4, TOPBAR_H + 12);
+    auto redraw = [&]() {
+        s_tft->fillRect(4, TOPBAR_H + 32, SCREEN_W - 8, 18, COL_BG);
+        s_tft->setTextColor(COL_WHITE, COL_BG);
+        s_tft->drawString(buf + "_", 4, TOPBAR_H + 34);
+    };
+    redraw();
+    while (true) {
+        char k = readKeyboard();
+        if (k == 0) { delay(20); continue; }
+        if (k == '\r' || k == '\n') break;
+        if ((k == 8 || k == 127) && buf.length() > 0) buf.remove(buf.length() - 1);
+        else if (isprint((unsigned char)k) && buf.length() < 18) buf += k;
+        redraw();
+        delay(20);
+    }
+    buf.trim();
+    return buf;
+}
+
+static void editDisplayName() {
+    String name = sysReadLine("Display name:", s_info.displayName);
+    if (name.isEmpty()) name = "Commander Smoke";
+    nvsPutString("display_name", name);
+    gatherData();
+    drawSysinfoScreen();
+}
 // ── Gather all local data ─────────────────────────────────────────────────────
 static void gatherData() {
     s_info.cpuMhz     = ESP.getCpuFreqMHz();
@@ -98,6 +134,10 @@ static void gatherData() {
     s_info.brightness = nvsGetInt("brightness", 16);
     if (s_info.brightness < 1) s_info.brightness = 1;
     if (s_info.brightness > 16) s_info.brightness = 16;
+    String displayName = nvsGetString("display_name", "Commander Smoke");
+    displayName.trim();
+    if (displayName.isEmpty()) displayName = "Commander Smoke";
+    strlcpy(s_info.displayName, displayName.c_str(), sizeof(s_info.displayName));
 
 }
 
@@ -288,6 +328,10 @@ static void drawSysinfoScreen() {
     drawValue(54, y, psBuf);
 
     y += 11;
+    drawLabel(4, y, "NAME");
+    drawValue(42, y, s_info.displayName, COL_CYAN);
+
+    y += 11;
     drawLabel(4, y, "BRIGHT");
     char brightBuf[10];
     snprintf(brightBuf, sizeof(brightBuf), "%d/16", s_info.brightness);
@@ -307,7 +351,7 @@ static void drawSysinfoScreen() {
     // Hint bar ─────────────────────────────────────────────────────────────
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
-    s_tft->drawCentreString("Q=home  R=refresh  +/- bright", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+    s_tft->drawCentreString("Q=home  R=refresh  D=name  +/- bright", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -326,6 +370,9 @@ bool sysinfoLoop(TFT_eSPI &tft) {
     if (key == 'r' || key == 'R') {
         gatherData();
         drawSysinfoScreen();
+    }
+    if (key == 'd' || key == 'D') {
+        editDisplayName();
     }
     if (key == '+' || key == '=') {
         applyBrightness(s_info.brightness + 1);

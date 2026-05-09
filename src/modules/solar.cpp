@@ -108,6 +108,30 @@ static void getDateStrUTC(int daysOffset, char *out, int outLen) {
 }
 
 // ── Kp history (small JSON, full parse) ──────────────────────────────────────
+static bool readKpValue(JsonVariant row, float &kp) {
+    JsonVariant v;
+    if (row.is<JsonArray>()) {
+        v = row[1];
+    } else {
+        v = row["Kp"];
+        if (v.isNull()) v = row["kp"];
+    }
+    if (v.isNull()) return false;
+    if (v.is<float>() || v.is<int>()) {
+        kp = v.as<float>();
+        return true;
+    }
+    const char *s = v.as<const char *>();
+    if (!s) return false;
+    kp = atof(s);
+    return true;
+}
+
+static const char *readTimeTag(JsonVariant row) {
+    if (row.is<JsonArray>()) return row[0] | "";
+    return row["time_tag"] | "";
+}
+
 static bool fetchKpHistory() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -122,24 +146,19 @@ static bool fetchKpHistory() {
     if (deserializeJson(doc, json)) return false;
     JsonArray arr = doc.as<JsonArray>();
     int total = arr.size();
-    int start = max(1, total - 8);
+    float latest[8];
+    int count = 0;
+    for (int i = total - 1; i >= 0 && count < 8; i--) {
+        float kp = 0.0f;
+        if (readKpValue(arr[i], kp)) latest[count++] = kp;
+    }
+    if (count == 0) return false;
+    s_sol.kpCurrent = latest[0];
     int histIdx = 0;
-
-    // NOAA sometimes returns Kp as a quoted string, sometimes as a float.
-    // Handle both so Kp=0.0 doesn't appear due to a silent type mismatch.
-    auto parseKp = [](JsonVariant v) -> float {
-        if (v.is<float>())        return v.as<float>();
-        const char *s = v.as<const char *>();
-        return s ? atof(s) : 0.0f;
-    };
-
-    for (int i = start; i < total; i++)
-        s_sol.kpHistory[histIdx++] = parseKp(arr[i][1]);
-    while (histIdx < 8) s_sol.kpHistory[histIdx++] = 0.0f;
-    s_sol.kpCurrent = parseKp(arr[total - 1][1]);
+    for (int i = count - 1; i >= 0; i--) s_sol.kpHistory[histIdx++] = latest[i];
+    while (histIdx < 8) s_sol.kpHistory[histIdx++] = s_sol.kpCurrent;
     return true;
 }
-
 // ── Kp forecast (small JSON, full parse) ─────────────────────────────────────
 static bool fetchKpForecast() {
     WiFiClientSecure client; client.setInsecure();
@@ -155,18 +174,25 @@ static bool fetchKpForecast() {
     if (deserializeJson(doc, json)) return false;
     JsonArray arr = doc.as<JsonArray>();
     s_sol.forecastCount = 0;
-    for (int i = 1; i < (int)arr.size() && s_sol.forecastCount < 7; i++) {
-        const char *timeTag = arr[i][0];
-        float kp = arr[i][1].as<float>();
-        if (timeTag && strlen(timeTag) >= 16) {
-            snprintf(s_sol.forecast[s_sol.forecastCount].hhmm, 6, "%.5s", timeTag + 11);
-            s_sol.forecast[s_sol.forecastCount].kp = kp;
-            s_sol.forecastCount++;
+    for (int pass = 0; pass < 2 && s_sol.forecastCount < 7; pass++) {
+        for (int i = 0; i < (int)arr.size() && s_sol.forecastCount < 7; i++) {
+            JsonVariant row = arr[i];
+            const char *observed = row.is<JsonArray>() ? "" : (row["observed"] | "");
+            bool isFuture = observed[0] && strcasecmp(observed, "observed") != 0;
+            if ((pass == 0 && !isFuture) || (pass == 1 && isFuture)) continue;
+
+            float kp = 0.0f;
+            if (!readKpValue(row, kp)) continue;
+            const char *timeTag = readTimeTag(row);
+            if (timeTag && strlen(timeTag) >= 16) {
+                snprintf(s_sol.forecast[s_sol.forecastCount].hhmm, 6, "%.5s", timeTag + 11);
+                s_sol.forecast[s_sol.forecastCount].kp = kp;
+                s_sol.forecastCount++;
+            }
         }
     }
     return s_sol.forecastCount > 0;
 }
-
 // ── Solar wind plasma — 1-hour file (small, no streaming needed) ──────────────
 static bool fetchSolarWind1h() {
     WiFiClientSecure client; client.setInsecure();
@@ -639,10 +665,11 @@ static void drawSolarScreen() {
         s_tft->drawCentreString("Bz SOUTHWARD - LoRa IMPACT POSSIBLE", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     } else {
         s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_CYAN);
+        drawFooterName(*s_tft, bottomY);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
-        drawBatteryIndicator(*s_tft, SCREEN_W - 48, bottomY + 1);
+        drawBatteryIndicator(*s_tft, SCREEN_W - 58, bottomY + 1);
     }
 }
 
