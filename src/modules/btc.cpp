@@ -295,11 +295,7 @@ static void fetchFearGreed() {
 }
 
 static uint16_t fgColor(int v) {
-    if (v <= 25) return COL_RED;
-    if (v <= 45) return COL_AMBER;
-    if (v <= 55) return COL_GREY_MID;
-    if (v <= 75) return COL_CYAN;
-    return COL_GOLD;
+    return COL_CYAN;
 }
 
 // ── Load: network then cache ──────────────────────────────────────────────────
@@ -368,7 +364,7 @@ static void drawBtcScreen() {
     // Status bar
     s_tft->fillRect(0, TOPBAR_H, SCREEN_W, STATUSBAR_H, COL_BG);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("COINGECKO", 4, TOPBAR_H + 3);
 
     // Fear & Greed centre
@@ -387,7 +383,7 @@ static void drawBtcScreen() {
         char syncBuf[24];
         snprintf(syncBuf, sizeof(syncBuf), "%s %s", s_fromCache ? "CACHED" : "LIVE", s_syncTime);
         int sw = s_tft->textWidth(syncBuf);
-        s_tft->setTextColor(s_fromCache ? COL_AMBER : COL_GOLD, COL_BG);
+        s_tft->setTextColor(s_fromCache ? COL_AMBER : COL_CYAN, COL_BG);
         s_tft->drawString(syncBuf, SCREEN_W - sw - 4, TOPBAR_H + 3);
     }
     s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
@@ -396,10 +392,10 @@ static void drawBtcScreen() {
 
     if (!anyValid) {
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("NO DATA", SCREEN_W / 2, contentY + 40, FONT_MED);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, contentY + 62, FONT_SMALL);
         s_tft->drawCentreString("Q=home  R=retry  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
         return;
@@ -426,7 +422,7 @@ static void drawBtcScreen() {
 
             if (!c.valid) {
                 s_tft->setTextFont(FONT_SMALL);
-                s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+                s_tft->setTextColor(COL_CYAN, COL_BG);
                 char buf[36];
                 snprintf(buf, sizeof(buf), "%.30s: NOT FOUND", s_coins[i].id);
                 s_tft->drawString(buf, 4, ry + 8);
@@ -441,7 +437,7 @@ static void drawBtcScreen() {
             snprintf(chg7d, sizeof(chg7d), "%+.1f%%", c.change7d);
 
             s_tft->setTextFont(FONT_MED);
-            s_tft->setTextColor(COL_GOLD, COL_BG);
+            s_tft->setTextColor(COL_CYAN, COL_BG);
             s_tft->drawString(c.symbol, 4, ry + 4);
 
             s_tft->setTextColor(COL_WHITE, COL_BG);
@@ -453,13 +449,13 @@ static void drawBtcScreen() {
             s_tft->setTextColor(c.change7d >= 0 ? COL_CYAN : COL_RED, COL_BG);
             s_tft->drawString(chg7d, 252, ry + 4);
 
-            s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+            s_tft->setTextColor(COL_CYAN, COL_BG);
             s_tft->drawString("24H", 190, ry + 16);
             s_tft->drawString("7D", 252, ry + 16);
         }
 
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
         return;
     }
@@ -471,7 +467,7 @@ static void drawBtcScreen() {
 
         if (!c.valid) {
             s_tft->setTextFont(FONT_SMALL);
-            s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+            s_tft->setTextColor(COL_CYAN, COL_BG);
             char buf[32];
             snprintf(buf, sizeof(buf), "%.30s: NOT FOUND", s_coins[i].id);
             s_tft->drawString(buf, 4, ry + rowH / 2 - 4);
@@ -481,13 +477,13 @@ static void drawBtcScreen() {
         // ── Left text block (x = 0..168) ─────────────────────────────────────
         // Symbol
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GOLD, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(c.symbol, 4, ry + 4);
         int symW = s_tft->textWidth(c.symbol);
 
         // Name (grey, same line, right of symbol)
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         char truncName[18];
         strlcpy(truncName, c.name, sizeof(truncName));
         s_tft->drawString(truncName, 4 + symW + 4, ry + 8);
@@ -511,7 +507,7 @@ static void drawBtcScreen() {
 
         // "24H" label
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString("24H", changeLabelX, ry + 56);
 
         // 7d change
@@ -520,7 +516,7 @@ static void drawBtcScreen() {
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(c.change7d >= 0 ? COL_CYAN : COL_RED, COL_BG);
         s_tft->drawString(chg7d, changeValueRight - s_tft->textWidth(chg7d), ry + 70);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString("7D", changeLabelX, ry + 70);
 
         // ── Divider between text and sparkline ────────────────────────────────
@@ -534,13 +530,13 @@ static void drawBtcScreen() {
 
         // Sparkline period label
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString("7D", sx, ry + rowH - 12);
     }
 
     // ── Hint bar ─────────────────────────────────────────────────────────────
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
 }
 

@@ -1,4 +1,4 @@
-﻿#include "solar.h"
+#include "solar.h"
 #include "../ui/theme.h"
 #include "../ui/widgets.h"
 #include "../config/nvs_config.h"
@@ -14,7 +14,7 @@
 #define CACHE_TTL_SEC   900   // 15 minutes
 #define DONKI_API_KEY_DEFAULT  "DEMO_KEY"
 
-// â”€â”€ Data model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Data model ────────────────────────────────────────────────────────────────
 static String donkiApiKey() {
     String key = nvsGetString("donki_key", DONKI_API_KEY_DEFAULT);
     key.trim();
@@ -44,7 +44,7 @@ struct SolarData {
 static SolarData s_sol;
 static TFT_eSPI *s_tft = nullptr;
 
-// â”€â”€ Kp helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Kp helpers ────────────────────────────────────────────────────────────────
 static const char *kpCondition(float kp) {
     if (kp < 3)  return "QUIET";
     if (kp < 4)  return "UNSETTLED";
@@ -79,7 +79,7 @@ static uint16_t kpColor(float kp) {
     return COL_RED;
 }
 
-// â”€â”€ X-ray flux to class string â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── X-ray flux to class string ────────────────────────────────────────────────
 static void fluxToClass(float flux, char *out, int outLen) {
     if (flux <= 0) { strlcpy(out, "N/A", outLen); return; }
     const char letters[] = "ABCMX";
@@ -92,7 +92,7 @@ static void fluxToClass(float flux, char *out, int outLen) {
     snprintf(out, outLen, "%c%.1f", letters[ci], sub);
 }
 
-// â”€â”€ Keyboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Keyboard ──────────────────────────────────────────────────────────────────
 static char readKeyboard() {
     char key = 0;
     Wire.requestFrom((uint8_t)KB_ADDR, (uint8_t)1);
@@ -100,14 +100,14 @@ static char readKeyboard() {
     return key;
 }
 
-// â”€â”€ UTC date string helper (for DONKI API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── UTC date string helper (for DONKI API) ────────────────────────────────────
 static void getDateStrUTC(int daysOffset, char *out, int outLen) {
     time_t t = time(nullptr) + (time_t)daysOffset * 86400;
     struct tm *ti = gmtime(&t);
     snprintf(out, outLen, "%04d-%02d-%02d", ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday);
 }
 
-// â”€â”€ Kp history (small JSON, full parse) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Kp history (small JSON, full parse) ──────────────────────────────────────
 static bool fetchKpHistory() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -140,7 +140,7 @@ static bool fetchKpHistory() {
     return true;
 }
 
-// â”€â”€ Kp forecast (small JSON, full parse) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Kp forecast (small JSON, full parse) ─────────────────────────────────────
 static bool fetchKpForecast() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -167,7 +167,7 @@ static bool fetchKpForecast() {
     return s_sol.forecastCount > 0;
 }
 
-// â”€â”€ Solar wind plasma â€” 1-hour file (small, no streaming needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Solar wind plasma — 1-hour file (small, no streaming needed) ──────────────
 static bool fetchSolarWind1h() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -190,7 +190,7 @@ static bool fetchSolarWind1h() {
     return true;
 }
 
-// â”€â”€ Solar wind Bz â€” 1-hour mag file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Solar wind Bz — 1-hour mag file ──────────────────────────────────────────
 static bool fetchSolarBz1h() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -211,7 +211,7 @@ static bool fetchSolarBz1h() {
     return true;
 }
 
-// â”€â”€ X-ray flux â€” stream the response, keep only last 400 bytes (file is huge) â”€â”€
+// ── X-ray flux — stream the response, keep only last 400 bytes (file is huge) ──
 static bool fetchXray1Min() {
     WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
@@ -220,7 +220,7 @@ static bool fetchXray1Min() {
     http.addHeader("User-Agent", "T-Deck-AI/1.0");
     if (http.GET() != 200) { http.end(); return false; }
 
-    // Read entire stream into a 400-byte rolling tail buffer â€” avoids OOM on
+    // Read entire stream into a 400-byte rolling tail buffer — avoids OOM on
     // the large (400KB+) 1-minute GOES file while still finding the last entry.
     static const int TAIL_MAX = 400;
     char     tail[TAIL_MAX + 1];
@@ -264,7 +264,7 @@ static bool fetchXray1Min() {
     return false;
 }
 
-// â”€â”€ NASA DONKI â€” solar flares (last 3 days) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── NASA DONKI — solar flares (last 3 days) ───────────────────────────────────
 static bool fetchSolarFlare() {
     char startDate[12], endDate[12];
     getDateStrUTC(-3, startDate, sizeof(startDate));
@@ -299,7 +299,7 @@ static bool fetchSolarFlare() {
     const char *peak = arr[last]["peakTime"]  | "";
     strlcpy(s_sol.flareClass, cls, sizeof(s_sol.flareClass));
 
-    // "2025-05-08 03:52Z" â†’ "05-08 03:52"
+    // "2025-05-08 03:52Z" → "05-08 03:52"
     if (strlen(peak) >= 16) {
         snprintf(s_sol.flareTime, sizeof(s_sol.flareTime), "%.5s %.5s", peak + 5, peak + 11);
     } else {
@@ -308,7 +308,7 @@ static bool fetchSolarFlare() {
     return true;
 }
 
-// â”€â”€ NASA DONKI â€” CME (last 4 days) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── NASA DONKI — CME (last 4 days) ───────────────────────────────────────────
 static bool fetchSolarCME() {
     char startDate[12], endDate[12];
     getDateStrUTC(-4, startDate, sizeof(startDate));
@@ -359,7 +359,7 @@ static bool fetchSolarCME() {
     return true;
 }
 
-// â”€â”€ Fetch all data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Fetch all data ─────────────────────────────────────────────────────────────
 static void fetchAllData() {
     s_sol.valid = false;
     s_sol.windSpeedKms = 0; s_sol.bzNT = 0;
@@ -408,7 +408,7 @@ static void fetchAllData() {
     }
 }
 
-// â”€â”€ Load from NVS cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Load from NVS cache ────────────────────────────────────────────────────────
 static bool loadFromCache() {
     int cachedAt = nvsGetInt("sol_cached_at", 0);
     if (cachedAt == 0) return false;
@@ -434,14 +434,14 @@ static bool loadFromCache() {
     String cmeT = nvsGetString("sol_cmet");
     strlcpy(s_sol.cmeTime, cmeT.isEmpty() ? "---" : cmeT.c_str(), sizeof(s_sol.cmeTime));
 
-    // History/forecast not cached â€” leave zeroed
+    // History/forecast not cached — leave zeroed
     s_sol.valid     = true;
     s_sol.fromCache = true;
     strlcpy(s_sol.syncStr, "CACHED", sizeof(s_sol.syncStr));
     return true;
 }
 
-// â”€â”€ Screen drawing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Screen drawing ────────────────────────────────────────────────────────────
 static void drawSolarScreen() {
     s_tft->fillScreen(COL_BG);
 
@@ -473,19 +473,19 @@ static void drawSolarScreen() {
 
     if (!s_sol.valid) {
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("NO DATA", SCREEN_W / 2, cy + 30, FONT_MED);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, cy + 52, FONT_SMALL);
         s_tft->drawCentreString("Q=home  R=retry", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
         return;
     }
 
-    // â”€â”€ Left: big Kp â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Left: big Kp ─────────────────────────────────────────────────────────
     uint16_t kpCol = kpColor(s_sol.kpCurrent);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("Kp INDEX", 4, cy);
 
     char kpBuf[6];
@@ -500,10 +500,10 @@ static void drawSolarScreen() {
 
     char auroraLbl[16];
     snprintf(auroraLbl, sizeof(auroraLbl), "AURORA ~%dN", kpAuroraLat(s_sol.kpCurrent));
-    s_tft->setTextColor(COL_GREY_MID, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString(auroraLbl, 4, cy + 48);
 
-    // â”€â”€ Right: 6 stats at 9px spacing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Right: 6 stats at 9px spacing ────────────────────────────────────────
     int rx = 154;
     struct { const char *lbl; char val[18]; uint16_t col; } stats[6];
 
@@ -537,17 +537,17 @@ static void drawSolarScreen() {
     for (int i = 0; i < 6; i++) {
         int sy = cy + i * 9;
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(stats[i].lbl, rx, sy);
         s_tft->setTextColor(stats[i].col, COL_BG);
         s_tft->drawString(stats[i].val, rx + 32, sy);
     }
 
-    // â”€â”€ 24h Kp bar chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 24h Kp bar chart ─────────────────────────────────────────────────────
     int chartY = cy + 62;
     s_tft->drawFastHLine(0, chartY - 2, SCREEN_W, COL_GREY_DIM);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("24H Kp", 4, chartY);
 
     int barAreaY = chartY + 10;
@@ -572,21 +572,21 @@ static void drawSolarScreen() {
         s_tft->drawString(kpN, x + (barW - lw) / 2, y + 1);
     }
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("9", barStartX - 8, barAreaY);
     s_tft->drawString("0", barStartX - 8, barAreaY + barMaxH - 6);
 
-    // â”€â”€ 48h Kp forecast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    int foreY = barAreaY + barMaxH + 4;
+    // ── 48h Kp forecast ───────────────────────────────────────────────────────
+    int foreY = barAreaY + barMaxH + 2;
     s_tft->drawFastHLine(0, foreY - 2, SCREEN_W, COL_GREY_DIM);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("48H FORECAST", 4, foreY);
 
     int count = min(s_sol.forecastCount, 7);
     int cellW = SCREEN_W / max(count, 1);
-    int fBarY = foreY + 12;
-    int fBarH = 58;
+    int fBarY = foreY + 10;
+    int fBarH = 66;
     for (int i = 0; i < count; i++) {
         int x = i * cellW;
         int cx = x + cellW / 2;
@@ -599,7 +599,7 @@ static void drawSolarScreen() {
         s_tft->fillRect(x + 5, fBarY + fBarH - barH, cellW - 10, barH - 1, fc);
 
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         int tw = s_tft->textWidth(s_sol.forecast[i].hhmm);
         s_tft->drawString(s_sol.forecast[i].hhmm, cx - tw / 2, foreY + 2);
 
@@ -609,10 +609,10 @@ static void drawSolarScreen() {
         s_tft->drawString(kpN, cx - kw / 2, fBarY + fBarH + 2);
 
 
-        if (i < count - 1) s_tft->drawFastVLine(x + cellW - 1, foreY + 1, 82, COL_GREY_DIM);
+        if (i < count - 1) s_tft->drawFastVLine(x + cellW - 1, foreY + 1, 90, COL_GREY_DIM);
     }
 
-    // â”€â”€ Alert / hint bar â€” fixed at screen bottom â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Alert / hint bar — fixed at screen bottom ─────────────────────────────
     int g = kpGLevel(s_sol.kpCurrent);
     bool bzAlert = s_sol.bzNT < -5.0f && s_sol.bzNT != 0.0f;
     int bottomY = SCREEN_H - BOTTOMBAR_H;
@@ -639,12 +639,12 @@ static void drawSolarScreen() {
     } else {
         s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_GREY_DIM);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     }
 }
 
-// â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public API ────────────────────────────────────────────────────────────────
 void solarInit(TFT_eSPI &tft) {
     s_tft = &tft;
     memset(&s_sol, 0, sizeof(s_sol));
@@ -657,7 +657,7 @@ void solarInit(TFT_eSPI &tft) {
     tft.fillScreen(COL_BG);
     drawTopbar(tft, "< HOME | SOLAR", "", COL_CYAN);
     tft.setTextFont(FONT_SMALL);
-    tft.setTextColor(COL_GREY_DIM, COL_BG);
+    tft.setTextColor(COL_CYAN, COL_BG);
     tft.drawCentreString("Fetching solar data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
 
     if (WiFi.isConnected()) fetchAllData();

@@ -206,10 +206,10 @@ static void drawQuakesScreen() {
 
     if (s_quakeCount == 0) {
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("NO DATA", SCREEN_W / 2, cy + 30, FONT_MED);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString(!WiFi.isConnected() ? "OFFLINE" : "No M3.5+ quakes this month",
                                 SCREEN_W / 2, cy + 52, FONT_SMALL);
         s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
@@ -233,7 +233,7 @@ static void drawQuakesScreen() {
         s_tft->drawString(q.place, 2 + magW, y + 2);
 
         int dw = s_tft->textWidth(q.when);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(q.when, SCREEN_W - dw - 2, y + 2);
 
         if (i < limit - 1)
@@ -244,7 +244,7 @@ static void drawQuakesScreen() {
     s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
     s_tft->drawFastHLine(0, by, SCREEN_W, COL_GREY_DIM);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);
 }
 
@@ -257,10 +257,10 @@ static void drawFiresScreen() {
 
     if (s_fireCount == 0) {
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("NO DATA", SCREEN_W / 2, cy + 30, FONT_MED);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString(!WiFi.isConnected() ? "OFFLINE" : "No wildfires tracked this year",
                                 SCREEN_W / 2, cy + 52, FONT_SMALL);
         s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
@@ -280,7 +280,7 @@ static void drawFiresScreen() {
         s_tft->drawString(fi.title, 12, y + 2);
 
         int dw = s_tft->textWidth(fi.when);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(fi.when, SCREEN_W - dw - 2, y + 2);
 
         if (i < limit - 1)
@@ -291,7 +291,7 @@ static void drawFiresScreen() {
     s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
     s_tft->drawFastHLine(0, by, SCREEN_W, COL_GREY_DIM);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);
 }
 

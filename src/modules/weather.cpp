@@ -348,7 +348,7 @@ static void drawWeatherScreen() {
     // Status bar: location left, sync time right
     s_tft->fillRect(0, TOPBAR_H, SCREEN_W, STATUSBAR_H, COL_BG);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_MID, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString(s_wx.locationName, 4, TOPBAR_H + 3);
     if (s_wx.valid) {
         char syncBuf[24];
@@ -364,10 +364,10 @@ static void drawWeatherScreen() {
 
     if (!s_wx.valid) {
         s_tft->setTextFont(FONT_MED);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("NO DATA", SCREEN_W / 2, y + 30, FONT_MED);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, y + 55, FONT_SMALL);
         s_tft->drawCentreString("Q=home  R=retry  L=set location", SCREEN_W / 2, SCREEN_H - 18, FONT_SMALL);
         return;
@@ -383,7 +383,7 @@ static void drawWeatherScreen() {
     // Degree F label next to temp
     int tempW = s_tft->textWidth(tempBuf);
     s_tft->setTextFont(FONT_MED);
-    s_tft->setTextColor(COL_GREY_MID, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("F", 6 + tempW + 2, y + 4);
 
     // Condition icon (right side of temp block) — vector, sz=2
@@ -398,7 +398,7 @@ static void drawWeatherScreen() {
     // Feels like
     int y3 = y2 + 18;
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_MID, COL_BG);
+    s_tft->setTextColor(COL_CYAN, COL_BG);
     char flBuf[20];
     snprintf(flBuf, sizeof(flBuf), "feels like %d F", (int)roundf(s_wx.feelsLikeF));
     s_tft->drawString(flBuf, 6, y3);
@@ -415,7 +415,7 @@ static void drawWeatherScreen() {
 
     for (int i = 0; i < 4; i++) {
         int x = i * 80 + 4;
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(stats[i].label, x, ys);
         s_tft->setTextColor(COL_WHITE, COL_BG);
         s_tft->drawString(stats[i].val, x, ys + 10);
@@ -435,7 +435,7 @@ static void drawWeatherScreen() {
 
         // Day name (today = cyan, others = grey)
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(i == 0 ? COL_CYAN : COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         int lw = s_tft->textWidth(s_wx.dayName[i]);
         s_tft->drawString(s_wx.dayName[i], x - lw / 2, yf + 1);
 
@@ -451,7 +451,7 @@ static void drawWeatherScreen() {
         int lw2 = s_tft->textWidth(lo);
         s_tft->setTextColor(COL_WHITE, COL_BG);
         s_tft->drawString(hi, x - hw  / 2, yf + 53);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawString(lo, x - lw2 / 2, yf + 64);
 
         // Vertical divider between columns (except last)
@@ -475,7 +475,7 @@ static void drawWeatherScreen() {
     } else {
         s_tft->drawFastHLine(0, ya, SCREEN_W, COL_GREY_DIM);
         s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_GREY_DIM, COL_BG);
+        s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh  L=location", SCREEN_W / 2, ya + 3, FONT_SMALL);
     }
 }
