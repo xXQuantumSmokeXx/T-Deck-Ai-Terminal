@@ -358,7 +358,7 @@ static void drawWeatherScreen() {
         s_tft->setTextColor(s_wx.fromCache ? COL_AMBER : COL_CYAN, COL_BG);
         s_tft->drawString(syncBuf, SCREEN_W - sw - 4, TOPBAR_H + 3);
     }
-    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
 
     int y = TOPBAR_H + STATUSBAR_H + 4;  // content start
 
@@ -423,12 +423,12 @@ static void drawWeatherScreen() {
 
     // ── Divider ───────────────────────────────────────────────────────────────
     int yd = ys + 24;
-    s_tft->drawFastHLine(0, yd, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, yd, SCREEN_W, COL_CYAN);
 
     // ── 5-day forecast strip ─────────────────────────────────────────────────
     // Icons are sz=2 for visibility. Layout fills to near-bottom so the
     // hint bar can live at a fixed SCREEN_H - BOTTOMBAR_H position.
-    int yf   = yd + 4;
+    int yf   = yd + 8;
     int colW = SCREEN_W / 5;  // 64px each
     for (int i = 0; i < 5; i++) {
         int x = i * colW + (colW / 2);  // column center x
@@ -440,7 +440,7 @@ static void drawWeatherScreen() {
         s_tft->drawString(s_wx.dayName[i], x - lw / 2, yf + 1);
 
         // Icon — sz=2 for larger display; center at yf+26 clears day-name text
-        drawWxIcon(x, yf + 26, s_wx.dayCode[i], COL_CYAN, 2);
+        drawWxIcon(x, yf + 32, s_wx.dayCode[i], COL_CYAN, 2);
 
         // Hi / lo temps below icon
         s_tft->setTextFont(FONT_SMALL);
@@ -450,16 +450,16 @@ static void drawWeatherScreen() {
         int hw  = s_tft->textWidth(hi);
         int lw2 = s_tft->textWidth(lo);
         s_tft->setTextColor(COL_WHITE, COL_BG);
-        s_tft->drawString(hi, x - hw  / 2, yf + 53);
+        s_tft->drawString(hi, x - hw  / 2, yf + 60);
         s_tft->setTextColor(COL_CYAN, COL_BG);
-        s_tft->drawString(lo, x - lw2 / 2, yf + 64);
+        s_tft->drawString(lo, x - lw2 / 2, yf + 72);
 
         // Vertical divider between columns (except last)
-        if (i < 4) s_tft->drawFastVLine(x + colW / 2, yf - 1, 78, COL_GREY_DIM);
+        if (i < 4) s_tft->drawFastVLine(x + colW / 2, yf - 1, 90, COL_CYAN);
     }
 
     // Horizontal separator at forecast bottom
-    s_tft->drawFastHLine(0, yf + 76, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, yf + 88, SCREEN_W, COL_CYAN);
 
     // ── Alert / hint bar — pinned to screen bottom ────────────────────────────
     int ya = SCREEN_H - BOTTOMBAR_H;
@@ -473,10 +473,11 @@ static void drawWeatherScreen() {
         int aw = s_tft->textWidth(alertText);
         s_tft->drawString(alertText, (SCREEN_W - aw) / 2, ya + 3);
     } else {
-        s_tft->drawFastHLine(0, ya, SCREEN_W, COL_GREY_DIM);
+        s_tft->drawFastHLine(0, ya, SCREEN_W, COL_CYAN);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh  L=location", SCREEN_W / 2, ya + 3, FONT_SMALL);
+        drawBatteryIndicator(*s_tft, SCREEN_W - 48, ya + 1);
     }
 }
 

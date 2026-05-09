@@ -1,4 +1,5 @@
 #pragma once
+#include <Arduino.h>
 #include <TFT_eSPI.h>
 #include "theme.h"
 
@@ -62,13 +63,58 @@ inline void drawStatusBar(TFT_eSPI &tft, bool wifiOk, bool loraOk, const char *c
 }
 
 // ── Bottom bar ────────────────────────────────────────────────────────────────
+// T-Deck battery ADC is IO04. The board uses a divider, so the ADC millivolts
+// are doubled back to an approximate LiPo pack voltage.
+#ifndef TDECK_BAT_ADC_PIN
+#define TDECK_BAT_ADC_PIN 4
+#endif
+
+inline int readTDeckBatteryMv() {
+#if defined(ARDUINO_ARCH_ESP32)
+    static bool adcReady = false;
+    if (!adcReady) {
+        analogReadResolution(12);
+        analogSetPinAttenuation(TDECK_BAT_ADC_PIN, ADC_11db);
+        adcReady = true;
+    }
+    uint32_t mv = analogReadMilliVolts(TDECK_BAT_ADC_PIN);
+    if (mv < 100) return -1;
+    return (int)(mv * 2);
+#else
+    return -1;
+#endif
+}
+
+inline int batteryPercentFromMv(int mv) {
+    if (mv <= 0) return -1;
+    if (mv >= 4200) return 100;
+    if (mv <= 3300) return 0;
+    return (mv - 3300) * 100 / 900;
+}
+
+inline void drawBatteryIndicator(TFT_eSPI &tft, int x, int y, uint16_t fg = COL_CYAN, uint16_t bg = COL_BG) {
+    int pct = batteryPercentFromMv(readTDeckBatteryMv());
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(fg, bg);
+
+    tft.drawRect(x, y + 3, 21, 10, fg);
+    tft.fillRect(x + 21, y + 6, 2, 4, fg);
+    int fillW = pct < 0 ? 0 : (pct * 17) / 100;
+    if (fillW > 0) tft.fillRect(x + 2, y + 5, fillW, 6, fg);
+
+    char buf[5];
+    if (pct < 0) strlcpy(buf, "--", sizeof(buf));
+    else snprintf(buf, sizeof(buf), "%d", pct);
+    tft.drawString(buf, x + 26, y + 3);
+}
 inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     int y = SCREEN_H - BOTTOMBAR_H;
     tft.fillRect(0, y, SCREEN_W, BOTTOMBAR_H, COL_BG);
-    tft.drawFastHLine(0, y, SCREEN_W, COL_GREY_DIM);
+    tft.drawFastHLine(0, y, SCREEN_W, COL_CYAN);
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(COL_CYAN, COL_BG);
     if (left && left[0]) tft.drawString(left, 4, y + 3);
+    drawBatteryIndicator(tft, SCREEN_W - 48, y + 1);
 }
 
 // ── Status dot ────────────────────────────────────────────────────────────────

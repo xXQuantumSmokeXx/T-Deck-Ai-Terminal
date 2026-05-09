@@ -467,7 +467,7 @@ static void drawSolarScreen() {
         s_tft->setTextColor(kpColor(s_sol.kpCurrent), COL_BG);
         s_tft->drawString(kpLbl, SCREEN_W - w - 4, TOPBAR_H + 3);
     }
-    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
 
     int cy = CONTENT_Y + 2;
 
@@ -544,14 +544,14 @@ static void drawSolarScreen() {
     }
 
     // ── 24h Kp bar chart ─────────────────────────────────────────────────────
-    int chartY = cy + 62;
-    s_tft->drawFastHLine(0, chartY - 2, SCREEN_W, COL_GREY_DIM);
+    int chartY = cy + 58;
+    s_tft->drawFastHLine(0, chartY - 2, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("24H Kp", 4, chartY);
 
     int barAreaY = chartY + 10;
-    int barMaxH  = 38;
+    int barMaxH  = 34;
     int barW     = 35;
     int barGap   = 3;
     int barStartX = (SCREEN_W - 8 * (barW + barGap) + barGap) / 2;
@@ -563,8 +563,8 @@ static void drawSolarScreen() {
         int x = barStartX + i * (barW + barGap);
         int y = barAreaY + barMaxH - barH;
         uint16_t bc = kpColor(kp);
-        s_tft->fillRect(x, barAreaY, barW, barMaxH, COL_GREY_DIM);
-        s_tft->fillRect(x, y, barW, barH, bc);
+        s_tft->drawRect(x, barAreaY, barW, barMaxH, COL_CYAN);
+        s_tft->fillRect(x + 1, y, barW - 2, barH, bc);
         char kpN[4]; snprintf(kpN, sizeof(kpN), "%.0f", kp);
         int lw = s_tft->textWidth(kpN);
         s_tft->setTextFont(FONT_SMALL);
@@ -577,8 +577,9 @@ static void drawSolarScreen() {
     s_tft->drawString("0", barStartX - 8, barAreaY + barMaxH - 6);
 
     // ── 48h Kp forecast ───────────────────────────────────────────────────────
+    int bottomY = SCREEN_H - BOTTOMBAR_H;
     int foreY = barAreaY + barMaxH + 2;
-    s_tft->drawFastHLine(0, foreY - 2, SCREEN_W, COL_GREY_DIM);
+    s_tft->drawFastHLine(0, foreY - 2, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
     s_tft->drawString("48H FORECAST", 4, foreY);
@@ -586,7 +587,8 @@ static void drawSolarScreen() {
     int count = min(s_sol.forecastCount, 7);
     int cellW = SCREEN_W / max(count, 1);
     int fBarY = foreY + 10;
-    int fBarH = 66;
+    int fBarH = bottomY - fBarY - 12;
+    if (fBarH < 42) fBarH = 42;
     for (int i = 0; i < count; i++) {
         int x = i * cellW;
         int cx = x + cellW / 2;
@@ -595,7 +597,7 @@ static void drawSolarScreen() {
         int barH = (int)(kp / 9.0f * fBarH);
         if (barH < 2) barH = 2;
 
-        s_tft->drawRect(x + 4, fBarY, cellW - 8, fBarH, COL_GREY_DIM);
+        s_tft->drawRect(x + 4, fBarY, cellW - 8, fBarH, COL_CYAN);
         s_tft->fillRect(x + 5, fBarY + fBarH - barH, cellW - 10, barH - 1, fc);
 
         s_tft->setTextFont(FONT_SMALL);
@@ -609,13 +611,12 @@ static void drawSolarScreen() {
         s_tft->drawString(kpN, cx - kw / 2, fBarY + fBarH + 2);
 
 
-        if (i < count - 1) s_tft->drawFastVLine(x + cellW - 1, foreY + 1, 90, COL_GREY_DIM);
+        if (i < count - 1) s_tft->drawFastVLine(x + cellW - 1, foreY + 1, bottomY - foreY - 2, COL_CYAN);
     }
 
     // ── Alert / hint bar — fixed at screen bottom ─────────────────────────────
     int g = kpGLevel(s_sol.kpCurrent);
     bool bzAlert = s_sol.bzNT < -5.0f && s_sol.bzNT != 0.0f;
-    int bottomY = SCREEN_H - BOTTOMBAR_H;
 
     if (g >= 3) {
         s_tft->fillRect(0, bottomY, SCREEN_W, BOTTOMBAR_H, COL_RED);
@@ -637,10 +638,11 @@ static void drawSolarScreen() {
         s_tft->setTextColor(COL_BG, COL_AMBER);
         s_tft->drawCentreString("Bz SOUTHWARD - LoRa IMPACT POSSIBLE", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     } else {
-        s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_GREY_DIM);
+        s_tft->drawFastHLine(0, bottomY, SCREEN_W, COL_CYAN);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
         s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
+        drawBatteryIndicator(*s_tft, SCREEN_W - 48, bottomY + 1);
     }
 }
 
