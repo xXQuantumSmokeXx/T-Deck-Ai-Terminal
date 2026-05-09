@@ -1,6 +1,6 @@
 ﻿# MayDay T-Deck AI Terminal
 
-MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck ESP32-S3. It started as an AI chat terminal and now includes a trackball-first launcher, AI persona chat, weather, solar conditions, crypto, field logging, wildfire and earthquake feeds, system diagnostics, and a WiFi screenshot endpoint.
+MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck ESP32-S3. It started as an AI chat terminal and now includes a trackball-first launcher, AI persona chat, weather, solar conditions, crypto, field logging, wildfire and earthquake feeds, and system diagnostics.
 
 [![Support on Patreon](https://img.shields.io/badge/Support-Patreon-orange)](https://www.patreon.com/c/xXQuantumSmokeXx)
 
@@ -17,14 +17,13 @@ MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck 
 - FIRES feed from NASA EONET open wildfire events
 - QUAKES feed from USGS recent earthquake data
 - SYSTEM screen for device, WiFi, SD, heap, uptime, backend, and persona status
-- WiFi screenshot server at `/ss` for grabbing the live 320x240 screen as a BMP
 - Cyan terminal visual style tuned for the T-Deck display
 
 ## Hardware Required
 
 - LILYGO T-Deck, ESP32-S3 version
 - microSD card for SD flashing, WiFi bootstrap files, personas, cache, and field logs
-- WiFi network for AI backend, weather, solar, crypto, fires, quakes, NTP, and screenshots
+- WiFi network for AI backend, weather, solar, crypto, fires, quakes, and NTP
 
 ## Flashing
 
@@ -194,28 +193,10 @@ Weather uses Open-Meteo and stores `wx_lat` and `wx_lon` in NVS after you set th
 
 Network feeds use short local caching where implemented so screens still have useful last-known data after a failed refresh.
 
-## Screenshot Endpoint
-
-When WiFi is connected, the firmware starts a small web server on port 80.
-
-Open this in a browser on the same network:
-
-```txt
-http://<device-ip>/ss
-```
-
-It downloads `screen.bmp`, a 320x240 24-bit BMP of the current T-Deck screen. The endpoint corrects the T-Deck readback byte order so captured cyan matches the device display. For comparison/debugging, the raw conversion is still available:
-
-```txt
-http://<device-ip>/ss?raw=1
-```
-
-The screenshot readback takes a few seconds.
-
 ## Project Layout
 
 ```txt
-src/main.cpp              Launcher, boot flow, trackball handling, screenshot server
+src/main.cpp              Launcher, boot flow, and trackball handling
 src/ui/                   Theme, layout, home screen, shared widgets
 src/modules/chat.*        AI chat client and persona-aware context
 src/modules/weather.*     Weather dashboard and location setup
@@ -240,7 +221,6 @@ This release is a major UI and feature update from the earlier AI-only build:
 - Added richer SOLAR visuals and 48h Kp forecast display
 - Added BTC/ETH crypto data and chart layout polish
 - Added SYSTEM diagnostics polish and faster load behavior
-- Added true-color `/ss` screenshots over WiFi
 - Added SD personas, portal URL loading, and on-device backend switching
 
 ## Security Notes
