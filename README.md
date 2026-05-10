@@ -6,6 +6,20 @@ MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck 
 
 ![MayDay T-Deck AI Terminal launcher](images/T-Deck-Ai-Terminal.png)
 
+## Display Gallery
+
+| AI Chat | Weather | Solar |
+| --- | --- | --- |
+| ![AI Chat screen](images/T-Deck-Display/Ai-Chat.png) | ![Weather screen](images/T-Deck-Display/Weather.png) | ![Solar screen](images/T-Deck-Display/Solar.png) |
+
+| Log | Crypto | Fires |
+| --- | --- | --- |
+| ![Log screen](images/T-Deck-Display/Log.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
+
+| USGS | System |
+| --- | --- |
+| ![USGS screen](images/T-Deck-Display/USGS.png) | ![System screen](images/T-Deck-Display/System.png) |
+
 ## Current Highlights
 
 - AI CHAT with SD-loaded personas and a simple HTTP backend
