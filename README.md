@@ -8,7 +8,6 @@ MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck 
 
 ## Current Highlights
 
-- Trackball-first UI for launcher navigation and screen scrolling
 - AI CHAT with SD-loaded personas and a simple HTTP backend
 - WEATHER using Open-Meteo with user-set latitude and longitude
 - SOLAR dashboard with NOAA/SWPC space weather, Kp history, 48h forecast, Bz, solar wind, flares, and CME data
