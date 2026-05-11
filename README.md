@@ -1,6 +1,6 @@
 ﻿# MayDay T-Deck AI Terminal
 
-MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck ESP32-S3. It started as an AI chat terminal and now includes a trackball-first launcher, AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, and system diagnostics.
+MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck ESP32-S3. It started as an AI chat terminal and now includes AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, and system diagnostics.
 
 [![Support on Patreon](https://img.shields.io/badge/Support-Patreon-orange)](https://www.patreon.com/c/xXQuantumSmokeXx)
 

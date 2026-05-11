@@ -9,7 +9,8 @@
 #define BOARD_SDCARD_CS  39
 #define LOG_PATH         "/logs/field.log"
 #define TMP_PATH         "/logs/field.tmp"
-#define LOG_VISIBLE      7
+#define LOG_VISIBLE      11
+#define LOG_ROW_H       16
 #define INPUT_MAX        96
 
 struct LogLine {
@@ -255,19 +256,16 @@ static void drawLogScreen() {
     } else {
         s_tft->setTextFont(FONT_SMALL);
         for (int i = 0; i < s_lineCount; i++) {
-            int ly = y + i * 20;
+            int ly = y + i * LOG_ROW_H;
             bool selected = i == s_selected;
             if (selected) {
-                s_tft->fillRect(0, ly - 1, SCREEN_W, 18, COL_INPUT_BG);
-                drawCornerBrackets(*s_tft, 1, ly - 1, SCREEN_W - 2, 18, COL_CYAN, 5);
+                s_tft->fillRect(0, ly - 1, SCREEN_W, LOG_ROW_H, COL_INPUT_BG);
+                drawCornerBrackets(*s_tft, 1, ly - 1, SCREEN_W - 2, LOG_ROW_H, COL_CYAN, 5);
             }
             s_tft->setTextColor(COL_CYAN, selected ? COL_INPUT_BG : COL_BG);
             s_tft->drawString(fitText(s_lines[i].text, SCREEN_W - 12), 6, ly + 2);
-            if (i < s_lineCount - 1) s_tft->drawFastHLine(0, ly + 18, SCREEN_W, COL_CYAN);
+            if (i < s_lineCount - 1) s_tft->drawFastHLine(0, ly + LOG_ROW_H - 1, SCREEN_W, COL_CYAN);
         }
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(COL_CYAN, COL_BG);
-        s_tft->drawCentreString("W/S select  E edit  D delete  Q home", SCREEN_W / 2, SCREEN_H - 34, FONT_SMALL);
     }
 
     if (s_savedOk) {
