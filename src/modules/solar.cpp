@@ -417,6 +417,21 @@ static void fetchAllData() {
         nvsPutString("sol_flaret", s_sol.flareTime);
         nvsPutInt("sol_cme_spd",   (int)s_sol.cmeSpeedKms);
         nvsPutString("sol_cmet",   s_sol.cmeTime);
+        nvsPutInt("sol_hist_n", 8);
+        for (int i = 0; i < 8; i++) {
+            char key[16];
+            snprintf(key, sizeof(key), "sol_hist%d", i);
+            nvsPutInt(key, (int)(s_sol.kpHistory[i] * 100));
+        }
+        nvsPutInt("sol_fc_n", s_sol.forecastCount);
+        for (int i = 0; i < 7; i++) {
+            char keyKp[16];
+            char keyTime[16];
+            snprintf(keyKp, sizeof(keyKp), "sol_fc%d", i);
+            snprintf(keyTime, sizeof(keyTime), "sol_fct%d", i);
+            nvsPutInt(keyKp, (int)(s_sol.forecast[i].kp * 100));
+            nvsPutString(keyTime, s_sol.forecast[i].hhmm);
+        }
     }
 }
 
@@ -446,7 +461,28 @@ static bool loadFromCache() {
     String cmeT = nvsGetString("sol_cmet");
     strlcpy(s_sol.cmeTime, cmeT.isEmpty() ? "NONE" : cmeT.c_str(), sizeof(s_sol.cmeTime));
 
-    // History/forecast not cached — leave zeroed
+    int histN = nvsGetInt("sol_hist_n", 0);
+    int fcN = nvsGetInt("sol_fc_n", 0);
+    if (histN < 8 || fcN <= 0) return false;
+    for (int i = 0; i < 8; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "sol_hist%d", i);
+        s_sol.kpHistory[i] = histN > i ? nvsGetInt(key, 0) / 100.0f : s_sol.kpCurrent;
+    }
+
+    if (fcN < 0) fcN = 0;
+    if (fcN > 7) fcN = 7;
+    s_sol.forecastCount = fcN;
+    for (int i = 0; i < 7; i++) {
+        char keyKp[16];
+        char keyTime[16];
+        snprintf(keyKp, sizeof(keyKp), "sol_fc%d", i);
+        snprintf(keyTime, sizeof(keyTime), "sol_fct%d", i);
+        s_sol.forecast[i].kp = i < fcN ? nvsGetInt(keyKp, 0) / 100.0f : 0.0f;
+        String hhmm = nvsGetString(keyTime);
+        strlcpy(s_sol.forecast[i].hhmm, (i < fcN && !hhmm.isEmpty()) ? hhmm.c_str() : "--:--", sizeof(s_sol.forecast[i].hhmm));
+    }
+
     s_sol.valid     = true;
     s_sol.fromCache = true;
     strlcpy(s_sol.syncStr, "CACHED", sizeof(s_sol.syncStr));
@@ -668,7 +704,12 @@ void solarInit(TFT_eSPI &tft) {
     strlcpy(s_sol.flareTime,  "---", sizeof(s_sol.flareTime));
     strlcpy(s_sol.cmeTime,    "NONE", sizeof(s_sol.cmeTime));
 
-    // Show loading indicator instead of NO DATA while fetching
+    if (loadFromCache()) {
+        drawSolarScreen();
+        return;
+    }
+
+    // Show loading indicator only when no valid cache is available.
     tft.fillScreen(COL_BG);
     drawTopbar(tft, "< HOME | SOLAR", "", COL_CYAN);
     tft.setTextFont(FONT_SMALL);
@@ -676,7 +717,7 @@ void solarInit(TFT_eSPI &tft) {
     tft.drawCentreString("Fetching solar data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
 
     if (WiFi.isConnected()) fetchAllData();
-    if (!s_sol.valid) loadFromCache();  // fallback to NVS cache if live fetch failed
+    if (!s_sol.valid) loadFromCache();
 
     drawSolarScreen();
 }

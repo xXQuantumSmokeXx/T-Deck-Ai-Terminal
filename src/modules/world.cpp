@@ -11,6 +11,7 @@
 #define KB_ADDR    0x55
 #define MAX_ITEMS  12
 #define ROW_H      16
+#define WORLD_CACHE_TTL_SEC 900
 
 // ── Data models ───────────────────────────────────────────────────────────────
 struct QuakeItem {
@@ -30,6 +31,8 @@ static FireItem   s_fires[MAX_ITEMS];
 static int        s_fireCount    = 0;
 static bool       s_showingFires = false;
 static char       s_syncStr[12]  = "";
+static time_t     s_quakeFetchedAt = 0;
+static time_t     s_fireFetchedAt  = 0;
 static TFT_eSPI  *s_tft          = nullptr;
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
@@ -93,6 +96,13 @@ static void msToWhen(long long ms, char *out, int outLen) {
     }
 }
 
+static bool cacheFresh(time_t fetchedAt, int count) {
+    if (count <= 0 || fetchedAt <= 0) return false;
+    time_t now = time(nullptr);
+    if (now <= 1000000) return true;
+    return (now - fetchedAt) <= WORLD_CACHE_TTL_SEC;
+}
+
 static uint16_t magColor(float mag) {
     if (mag >= 7.0f) return COL_RED;
     if (mag >= 6.0f) return COL_AMBER;
@@ -142,6 +152,7 @@ static bool fetchQuakes() {
         if (ms > 0) msToWhen(ms, q.when, (int)sizeof(q.when));
         else        strlcpy(q.when, "--", sizeof(q.when));
     }
+    if (s_quakeCount > 0) s_quakeFetchedAt = time(nullptr);
     return s_quakeCount > 0;
 }
 
@@ -192,6 +203,7 @@ static bool fetchFires() {
         else
             strlcpy(fi.when, "--", sizeof(fi.when));
     }
+    if (s_fireCount > 0) s_fireFetchedAt = time(nullptr);
     return s_fireCount > 0;
 }
 
@@ -319,22 +331,26 @@ static void drawFiresScreen() {
 void worldInit(TFT_eSPI &tft) {
     s_tft          = &tft;
     s_showingFires = false;
-    s_quakeCount   = 0;
-    tft.fillScreen(COL_BG);
-    drawTopbar(tft, "< HOME | USGS", "", COL_CYAN);
-    if (WiFi.isConnected()) fetchQuakes();
     updateSyncStr();
+    if (!cacheFresh(s_quakeFetchedAt, s_quakeCount)) {
+        tft.fillScreen(COL_BG);
+        drawTopbar(tft, "< HOME | USGS", "", COL_CYAN);
+        if (WiFi.isConnected()) fetchQuakes();
+        updateSyncStr();
+    }
     drawQuakesScreen();
 }
 
 void worldInitFires(TFT_eSPI &tft) {
     s_tft          = &tft;
     s_showingFires = true;
-    s_fireCount    = 0;
-    tft.fillScreen(COL_BG);
-    drawTopbar(tft, "< HOME | FIRES", "", COL_CYAN);
-    if (WiFi.isConnected()) fetchFires();
     updateSyncStr();
+    if (!cacheFresh(s_fireFetchedAt, s_fireCount)) {
+        tft.fillScreen(COL_BG);
+        drawTopbar(tft, "< HOME | FIRES", "", COL_CYAN);
+        if (WiFi.isConnected()) fetchFires();
+        updateSyncStr();
+    }
     drawFiresScreen();
 }
 

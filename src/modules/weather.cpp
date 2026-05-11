@@ -302,17 +302,14 @@ static bool fetchWeather() {
 static void loadWeatherData() {
     s_wx.valid = false;
 
-    // Try fresh network first if WiFi is up
-    if (WiFi.isConnected()) {
-        if (fetchWeather()) return;
-    }
-
-    // Fall back to cache
     String json;
     if (loadCacheFromSD(json) && parseWeatherJson(json)) {
         s_wx.fromCache = true;
+        return;
     }
-    // If still not valid, s_wx.valid stays false — show NO DATA
+
+    if (WiFi.isConnected()) fetchWeather();
+    // If still not valid, s_wx.valid stays false - show NO DATA
 }
 
 // ── Location name derivation (simple lat/lon → region label) ─────────────────
