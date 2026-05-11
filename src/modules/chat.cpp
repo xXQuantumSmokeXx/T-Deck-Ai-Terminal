@@ -80,18 +80,6 @@ static int      s_histCount = 0;
 static int      s_scrollOff = 0;
 static String   s_inputBuf  = "";
 
-// ── Backlight ─────────────────────────────────────────────────────────────────
-#define BL_PWM_CHANNEL  0
-#define BOARD_BL_PIN    42
-static uint8_t s_bright = 16;
-
-static void setBrightness(uint8_t level16) {
-    if (level16 < 1) level16 = 1;
-    if (level16 > 16) level16 = 16;
-    s_bright = level16;
-    ledcWrite(BL_PWM_CHANNEL, (uint32_t)level16 * 255 / 16);
-    nvsPutInt("brightness", level16);
-}
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 static TFT_eSPI *s_tft = nullptr;
@@ -342,9 +330,6 @@ void chatInit(TFT_eSPI &tft) {
     s_scrollOff = 0;
     s_inputBuf  = "";
     ctxClear();
-    s_bright = nvsGetInt("brightness", 16);
-    if (s_bright < 1) s_bright = 1;
-    if (s_bright > 16) s_bright = 16;
 
     tft.fillScreen(COL_BG);
     drawChatTopbar();
@@ -352,7 +337,7 @@ void chatInit(TFT_eSPI &tft) {
 
     PersonaDef *p = personaMgrGet();
     pushLine(">> " + String(p->name) + (p->title[0] ? " - " + String(p->title) : ""), COL_CYAN);
-    pushLine("seturl setwifi persona clear b+ b-", COL_SYS);
+    pushLine("seturl setwifi persona clear", COL_SYS);
     redrawChatArea();
     redrawInput();
 }
@@ -370,17 +355,7 @@ bool chatLoop(TFT_eSPI &tft) {
         s_inputBuf = "";
         redrawInput();
 
-        if (msg == "b+") {
-            if (s_bright < 16) s_bright += 2;
-            setBrightness(s_bright);
-            pushLine("Brightness: " + String(s_bright) + "/16", COL_SYS);
-            scrollToBottom(); redrawInput();
-        } else if (msg == "b-") {
-            if (s_bright > 2) s_bright -= 2;
-            setBrightness(s_bright);
-            pushLine("Brightness: " + String(s_bright) + "/16", COL_SYS);
-            scrollToBottom(); redrawInput();
-        } else if (msg == "clear") {
+        if (msg == "clear") {
             s_histCount = 0; s_scrollOff = 0; ctxClear();
             redrawChatArea(); redrawInput();
         } else if (msg == "persona") {

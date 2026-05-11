@@ -195,7 +195,6 @@ If `/crypto.txt` is missing, the firmware also checks `/coins.txt`, then falls b
 - `setwifi`: change WiFi credentials
 - `persona`: switch loaded persona slot
 - `clear`: clear chat and context
-- `b+` / `b-`: adjust brightness
 
 ### WEATHER
 
