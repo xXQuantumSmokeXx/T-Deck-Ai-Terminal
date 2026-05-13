@@ -42,21 +42,27 @@ Built by Commander Smoke, with development assistance from Codex.
 
 ## Flashing
 
-1. Install PlatformIO.
-2. Clone this repo.
-3. Build the firmware:
+**Option 1 — M5Launcher (SD card, no USB required):**
+
+1. Grab `AiTerminal.bin` from the [latest release](https://github.com/xXQuantumSmokeXx/T-Deck-Ai-Terminal/releases/latest) and copy it to your SD card root.
+2. Boot into M5Launcher on the T-Deck.
+3. Select `AiTerminal.bin` and flash.
+
+**Option 2 — Build and flash from source:**
+
+1. Install PlatformIO and clone this repo.
+2. Flash directly over USB:
+
+```sh
+pio run --target upload
+```
+
+Or build the binary and copy it to SD for M5Launcher:
 
 ```sh
 pio run
-```
-
-4. Copy the generated binary to the SD card root:
-
-```sh
 copy .pio\build\T-Deck\firmware.bin F:\AiTerminal.bin
 ```
-
-5. Eject the SD card, insert it into the T-Deck, and boot. The device flashes itself from `AiTerminal.bin` on first boot, then launches normally.
 
 ## SD Card Setup
 
