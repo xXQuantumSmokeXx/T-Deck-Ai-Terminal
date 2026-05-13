@@ -1,6 +1,6 @@
-﻿# MayDay T-Deck AI Terminal
+# MayDay T-Deck AI Terminal
 
-MayDay T-Deck AI Terminal is a field-ready firmware build for the LILYGO T-Deck ESP32-S3. It started as an AI chat terminal and now includes AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, and system diagnostics.
+A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, and system diagnostics.
 
 Built by Commander Smoke, with development assistance from Codex.
 
@@ -22,23 +22,23 @@ Built by Commander Smoke, with development assistance from Codex.
 | --- | --- |
 | ![USGS screen](images/T-Deck-Display/USGS.png) | ![System screen](images/T-Deck-Display/System.png) |
 
-## Current Highlights
+## Features
 
-- AI CHAT with SD-loaded personas and a simple HTTP backend
-- WEATHER using Open-Meteo with user-set latitude and longitude
-- SOLAR dashboard with NOAA/SWPC space weather, Kp history, 48h forecast, Bz, solar wind, flares, and CME data
-- LOG field notes stored on SD card with add, select, edit, and delete support
-- CRYPTO screen with up to six CoinGecko favorites, 24h and 7d movement, mini charts, and Fear & Greed
-- FIRES feed from NASA EONET open wildfire events
-- USGS feed for recent earthquake data
-- SYSTEM screen for device, WiFi, SD, heap, uptime, backend, persona status, and brightness
-- Cyan terminal visual style tuned for the T-Deck display
+- **AI CHAT** — SD-loaded personas, named assistants, HTTP backend with full conversation context
+- **WEATHER** — Open-Meteo forecast with user-configured latitude and longitude, 5-day strip, stats row
+- **SOLAR** — NOAA/SWPC space weather: Kp history, 48h forecast, Bz, solar wind speed, flares, and CME data
+- **LOG** — Field notes written to SD card with add, select, edit, and delete support
+- **CRYPTO** — Up to six CoinGecko favorites, 24h/7d movement, 7-day sparklines, and Fear & Greed index
+- **FIRES** — NASA EONET open wildfire events, live feed
+- **USGS** — Recent M3.5+ earthquake feed from USGS FDSNWS
+- **SYSTEM** — Device, WiFi, SD, heap, uptime, backend, persona status, and brightness control
+- Cyan terminal aesthetic tuned for the T-Deck 320×240 display
 
 ## Hardware Required
 
 - LILYGO T-Deck, ESP32-S3 version
-- microSD card for SD flashing, WiFi bootstrap files, personas, cache, and field logs
-- WiFi network for AI backend, weather, solar, crypto, fires, USGS earthquake data, and NTP
+- microSD card for WiFi bootstrap, personas, cache, and field logs
+- WiFi network for AI backend, weather, solar, crypto, fire/quake feeds, and NTP sync
 
 ## Flashing
 
@@ -50,46 +50,36 @@ Built by Commander Smoke, with development assistance from Codex.
 pio run
 ```
 
-4. Copy the generated firmware to the SD card root:
+4. Copy the generated binary to the SD card root:
 
 ```sh
-copy .pio\build\T-Deck\firmware.bin F:\firmware.bin
+copy .pio\build\T-Deck\firmware.bin F:\AiTerminal.bin
 ```
 
-5. Flash with your T-Deck SD flashing workflow, such as M5Launcher, or flash directly over USB if preferred.
-
-The project also keeps a convenience copy at `firmware.bin` after local builds during development.
+5. Eject the SD card, insert it into the T-Deck, and boot. The device flashes itself from `AiTerminal.bin` on first boot, then launches normally.
 
 ## SD Card Setup
 
-The firmware reads a few simple text files from the SD card root or from known folders.
+The firmware reads plain text files from the SD card root on boot. All setup files are optional after initial configuration — credentials and settings are persisted to NVS.
 
 ### `wifi.txt`
-
-Place this on the SD card root before first boot:
 
 ```txt
 YourWiFiSSID
 YourWiFiPassword
 ```
 
-On boot, the firmware saves these credentials to NVS. Delete `wifi.txt` manually after setup if you do not want WiFi credentials left on the SD card.
+Read on boot, saved to NVS. Delete after confirmed working.
 
 ### `portal.txt`
-
-Place your AI backend base URL on the first line:
 
 ```txt
 https://your-server-url.ngrok-free.app
 ```
 
-The firmware posts chat requests to:
+Sets the AI backend base URL. Chat requests go to `{portal_url}/simple`. Delete after confirmed working if desired.
 
-```txt
-{portal_url}/simple
-```
-
-Expected request body:
+**Expected request body:**
 
 ```json
 {
@@ -102,30 +92,27 @@ Expected request body:
 }
 ```
 
-Expected response body:
+**Expected response body:**
 
 ```json
-{
-  "response": "assistant reply text"
-}
+{ "response": "assistant reply text" }
 ```
 
-You can also change the backend from AI CHAT by typing `seturl`.
+You can also change the backend URL from within AI CHAT by typing `seturl`.
 
-### `donki.txt` Optional
+### `donki.txt` — Optional
 
-SOLAR works out of the box with NASA's public `DEMO_KEY`, but that key has shared rate limits. If you want higher NASA DONKI limits, get a free API key from NASA and place it on the first line of `donki.txt` on the SD card root:
+SOLAR uses NASA's public `DEMO_KEY` by default. For higher rate limits, get a free key at [api.nasa.gov](https://api.nasa.gov) and place it on the first line:
 
 ```txt
 YOUR_NASA_DONKI_API_KEY
 ```
 
-On boot, the firmware saves this to NVS as `donki_key`. The file is not removed automatically, so if the key is entered wrong you can fix `donki.txt` and reboot. After SOLAR is confirmed working, delete `donki.txt` manually if you do not want the key left on the SD card. If no key is configured, SOLAR continues using `DEMO_KEY`.
-
+Saved to NVS on boot. Delete after confirmed working.
 
 ### Personas
 
-Optional persona files live in:
+Persona files live in `/personas/` on the SD card:
 
 ```txt
 /personas/p1.txt
@@ -133,7 +120,7 @@ Optional persona files live in:
 /personas/p3.txt
 ```
 
-Each file uses this format:
+**File format:**
 
 ```txt
 NAME
@@ -142,27 +129,15 @@ System prompt text goes here.
 It can span multiple lines.
 ```
 
-Slot 1 has a built-in fallback if `/personas/p1.txt` is missing. Slots 2 and 3 load only when their files exist. In AI CHAT, type `persona` to switch loaded personas.
+Slot 1 has a built-in fallback if `/personas/p1.txt` is missing. Slots 2 and 3 load only when their files are present. Type `persona` in AI CHAT to cycle slots. Type `setassist1` or `setassist2` to configure the display name shown in the chat header for each slot.
 
 ### Field Logs
 
-The LOG screen writes entries to:
-
-```txt
-/logs/field.log
-```
-
-The firmware creates and updates this file from the device. Keep the SD card inserted if you want LOG to work.
+The LOG screen writes entries to `/logs/field.log`. The firmware creates this file automatically. Keep the SD card inserted for LOG to work.
 
 ### Crypto Favorites
 
-The CRYPTO screen can load up to six CoinGecko coin IDs from the SD card root:
-
-```txt
-/crypto.txt
-```
-
-Use one CoinGecko coin ID per line. These are IDs such as `bitcoin`, `ethereum`, `solana`, or `chainlink`, not ticker symbols such as BTC or ETH.
+Load up to six CoinGecko coin IDs from `/crypto.txt` (one per line):
 
 ```txt
 bitcoin
@@ -173,110 +148,95 @@ dogecoin
 litecoin
 ```
 
-If `/crypto.txt` is missing, the firmware also checks `/coins.txt`, then falls back to coins saved from the on-device editor or the default Bitcoin/Ethereum pair.
+Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any on-device saved coins, then to the default BTC/ETH pair.
 
 ## Controls
 
 ### Launcher
 
-- Trackball up/down/left/right: move between tiles
-- Enter: open selected tile
-- W/A/S/D or I/J/K/L: keyboard navigation
+| Input | Action |
+| --- | --- |
+| Trackball up/down/left/right | Move between tiles |
+| Trackball click (press ball) | Open selected tile |
+| Enter | Open selected tile |
+| W/A/S/D or I/J/K/L | Keyboard tile navigation |
 
 ### Module Screens
 
-- Trackball left/back gesture: return home
-- Q, Escape, Ctrl+Q, or Backspace: return home on most screens
-- R: refresh on data screens that support it
+- **Trackball roll right** or **Q / Escape / Backspace**: return home
+- **R**: refresh on data screens that support it
 
 ### AI CHAT
 
-- Type a message and press Enter to send
-- Trackball up/down: scroll chat history
-- `seturl`: change AI backend URL
-- `setwifi`: change WiFi credentials
-- `persona`: switch loaded persona slot
-- `clear`: clear chat and context
+| Command | Action |
+| --- | --- |
+| Type + Enter | Send message |
+| Trackball up/down | Scroll chat history |
+| `seturl` | Change AI backend URL |
+| `setwifi` | Change WiFi credentials |
+| `setassist1` / `setassist2` | Set chat display name for persona slot 1 or 2 |
+| `persona` | Cycle loaded persona slot |
+| `clear` | Clear chat history and context |
 
 ### WEATHER
 
-- R: refresh weather
-- L: set latitude and longitude
-- Q: return home
-
-Weather uses Open-Meteo and stores `wx_lat` and `wx_lon` in NVS after you set them on device.
-
-### LOG
-
-- Type a note and press Enter to save
-- W/S or trackball up/down: select or scroll entries
-- E: edit selected entry
-- D: delete selected entry
-- Q: return home
+- **R**: refresh — **L**: set latitude/longitude — **Q**: home
+- Coordinates saved to NVS as `wx_lat` / `wx_lon`
 
 ### CRYPTO
 
-- R: refresh crypto data
-- C: edit up to six CoinGecko coin ID slots on device
-- Q: return home
+- **R**: refresh — **C**: open on-device coin ID editor (up to six slots) — **Q**: home
 
 ### SYSTEM
 
-- R: refresh diagnostics
-- + / -: adjust screen brightness and save it to device settings
-- Q: return home
+- **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **Q**: home
 
 ## Data Sources
 
 | Screen | Source |
 | --- | --- |
 | WEATHER | Open-Meteo forecast API |
-| SOLAR | NOAA/SWPC plus NASA DONKI for flares and CME data |
-| CRYPTO | CoinGecko market data, SD/NVS favorite coin IDs, plus Alternative.me Fear & Greed |
+| SOLAR | NOAA/SWPC + NASA DONKI (flares, CME) |
+| CRYPTO | CoinGecko markets + Alternative.me Fear & Greed |
 | FIRES | NASA EONET open wildfire events |
-| USGS | USGS earthquake feed |
-| SYSTEM | Local ESP32/T-Deck state and brightness setting |
+| USGS | USGS FDSNWS earthquake feed |
 | LOG | Local SD card `/logs/field.log` |
+| SYSTEM | Local ESP32-S3 state |
 
-Network feeds use short local caching where implemented so screens still have useful last-known data after a failed refresh.
+Data screens cache their last successful fetch so they remain useful between refreshes and across brief offline periods.
 
 ## Project Layout
 
 ```txt
-src/main.cpp              Launcher, boot flow, and trackball handling
-src/ui/                   Theme, layout, home screen, shared widgets
-src/modules/chat.*        AI chat client and persona-aware context
-src/modules/weather.*     Weather dashboard and location setup
-src/modules/solar.*       Solar and space-weather dashboard
+src/main.cpp              Boot flow, screen router, trackball and keyboard handling
+src/ui/                   Theme constants, home launcher, shared widgets
+src/modules/chat.*        AI chat client, persona context, command handling
+src/modules/weather.*     Weather dashboard and location configuration
+src/modules/solar.*       Solar / space-weather dashboard
 src/modules/btc.*         Crypto dashboard and CoinGecko favorites
-src/modules/noaa.*        Field LOG module, replacing the old NOAA alert experiment
+src/modules/noaa.*        Field LOG module
 src/modules/world.*       FIRES and USGS earthquake feeds
-src/modules/sysinfo.*     SYSTEM diagnostics
-src/net/wifi_mgr.*        WiFi/NVS/SD credential handling
-src/persona/              SD persona loading and slot selection
-sd_card/                  Example SD card files
-config-examples/          Legacy provider examples from the earlier AI-only release
+src/modules/sysinfo.*     System diagnostics and brightness control
+src/net/wifi_mgr.*        WiFi credential handling and NVS storage
+src/persona/              SD persona loader and slot manager
+sd_card/                  Example SD card layout and setup files
 ```
 
-## Notes For This Release
+## v1.1.1 Changes
 
-This release is a major UI and feature update from the earlier AI-only build:
-
-- Removed touch UI assumptions in favor of trackball navigation
-- Replaced the failed NOAA alert section with the SD-backed LOG screen
-- Added real-time FIRES and USGS earthquake screens
-- Added richer SOLAR visuals and 48h Kp forecast display
-- Added configurable CoinGecko crypto favorites and chart layout polish
-- Added SYSTEM diagnostics polish, persistent brightness control, and faster load behavior
-- Added SD personas, portal URL loading, and on-device backend switching
+- Trackball click (press ball down) now launches the selected home tile
+- Assistant display names in chat driven by `setassist1` / `setassist2` instead of defaulting to persona name
+- Fixed screen bleedthrough on CRYPTO and WEATHER after SD card SPI operations
+- Fixed FIRES showing No Data on first load due to stream-parse timing
+- Restored bottom hint bar borders on CRYPTO screen
 
 ## Security Notes
 
-- Remove sensitive SD setup files manually after setup when possible.
-- `wifi.txt` is not removed automatically. Delete it after WiFi credentials are saved and confirmed working.
-- `portal.txt` is not removed automatically. Delete it after the backend URL is saved and confirmed working if desired.
-- `donki.txt` is not removed automatically. Delete it manually only after you confirm the NASA key works.
-- Persona files may contain private prompts. Treat the SD card accordingly.
+All SD setup files persist until you delete them. Remove them manually after confirming each works.
 
+- **`wifi.txt`** — contains WiFi credentials
+- **`portal.txt`** — contains your backend URL
+- **`donki.txt`** — contains your NASA API key
+- **Persona files** — may contain private system prompts
 
-
+Treat the SD card as sensitive. If it is lost or accessed, any remaining setup files are readable in plain text.

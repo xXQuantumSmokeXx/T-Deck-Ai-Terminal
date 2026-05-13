@@ -34,6 +34,7 @@
 #define BOARD_TBOX_DOWN  15
 #define BOARD_TBOX_LEFT   2
 #define BOARD_TBOX_RIGHT  1
+#define BOARD_TBOX_CLICK  0
 #define KB_ADDR         0x55
 
 // ── Backlight ─────────────────────────────────────────────────────────────────
@@ -109,15 +110,17 @@ static char readKeyboard() {
 }
 
 // ── Trackball — interrupt-based pulse counting ────────────────────────────────
-static volatile int s_tbUp    = 0;
-static volatile int s_tbDown  = 0;
-static volatile int s_tbLeft  = 0;
-static volatile int s_tbRight = 0;
+static volatile int  s_tbUp    = 0;
+static volatile int  s_tbDown  = 0;
+static volatile int  s_tbLeft  = 0;
+static volatile int  s_tbRight = 0;
+static volatile bool s_tbClick = false;
 
 void IRAM_ATTR isrTbUp()    { s_tbUp++; }
 void IRAM_ATTR isrTbDown()  { s_tbDown++; }
 void IRAM_ATTR isrTbLeft()  { s_tbLeft++; }
 void IRAM_ATTR isrTbRight() { s_tbRight++; }
+void IRAM_ATTR isrTbClick() { s_tbClick = true; }
 
 static void drainTrackball(int &up, int &down, int &left, int &right) {
     up = 0;
@@ -319,6 +322,7 @@ void setup() {
     pinMode(BOARD_TBOX_DOWN,  INPUT_PULLUP);
     pinMode(BOARD_TBOX_LEFT,  INPUT_PULLUP);
     pinMode(BOARD_TBOX_RIGHT, INPUT_PULLUP);
+    pinMode(BOARD_TBOX_CLICK, INPUT_PULLUP);
 
     SPI.begin(BOARD_SPI_SCK, BOARD_SPI_MISO, BOARD_SPI_MOSI);
     Wire.begin(BOARD_I2C_SDA, BOARD_I2C_SCL);
@@ -332,6 +336,7 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(BOARD_TBOX_DOWN),  isrTbDown,  FALLING);
     attachInterrupt(digitalPinToInterrupt(BOARD_TBOX_LEFT),  isrTbLeft,  FALLING);
     attachInterrupt(digitalPinToInterrupt(BOARD_TBOX_RIGHT), isrTbRight, FALLING);
+    attachInterrupt(digitalPinToInterrupt(BOARD_TBOX_CLICK), isrTbClick, FALLING);
 
     showSplash();
     loadPortalUrlFromSD();
@@ -348,6 +353,12 @@ void loop() {
 
     if (s_screen == SCR_HOME) {
         handleHomeTrackball();
+
+        bool clicked = false;
+        noInterrupts();
+        if (s_tbClick) { s_tbClick = false; clicked = true; }
+        interrupts();
+        if (clicked) { launchTile(homeSelected()); return; }
 
         char key = readKeyboard();
         if      (key == '\r' || key == '\n') { launchTile(homeSelected()); return; }

@@ -4,6 +4,7 @@
 #include "../ui/widgets.h"
 #include "../config/nvs_config.h"
 #include <Wire.h>
+#include <SPI.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -327,6 +328,12 @@ static void buildLocationName() {
 }
 
 // ── Screen drawing ────────────────────────────────────────────────────────────
+static void spiReinitForTFT() {
+    digitalWrite(BOARD_SDCARD_CS, HIGH);
+    SPI.beginTransaction(SPISettings(40000000, MSBFIRST, SPI_MODE0));
+    SPI.endTransaction();
+}
+
 static void drawWeatherScreen() {
     s_tft->fillScreen(COL_BG);
 
@@ -356,6 +363,9 @@ static void drawWeatherScreen() {
         s_tft->drawString(syncBuf, SCREEN_W - sw - 4, TOPBAR_H + 3);
     }
     s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, COL_CYAN);
+
+    // fillScreen is unreliable after SD SPI ops — secondary fillRect clears what it missed.
+    s_tft->fillRect(0, CONTENT_Y, SCREEN_W, SCREEN_H - CONTENT_Y, COL_BG);
 
     int y = TOPBAR_H + STATUSBAR_H + 4;  // content start
 
@@ -498,12 +508,34 @@ void weatherInit(TFT_eSPI &tft) {
     s_tft = &tft;
     s_wx.valid = false;
 
-    buildLocationName();
+    buildLocationName();  // NVS only — no SD
 
+    // Show loading screen BEFORE any SD operations so the TFT clear runs
+    // while the SPI bus is in a known TFT state (mirrors world.cpp pattern).
     tft.fillScreen(COL_BG);
     drawTopbar(tft, "< HOME | WEATHER", "", COL_CYAN);
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(COL_CYAN, COL_BG);
+    tft.drawCentreString("Fetching weather data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
 
-    loadWeatherData();
+    // SD ops: check cache
+    String json;
+    bool cacheHit = loadCacheFromSD(json) && parseWeatherJson(json);
+    if (cacheHit) s_wx.fromCache = true;
+
+    // Restore SPI for TFT after SD operations
+    spiReinitForTFT();
+
+    if (cacheHit) {
+        drawWeatherScreen();
+        return;
+    }
+
+    // No cache — fetch live (fetchWeather → saveCacheToSD → SD ops), then draw
+    if (WiFi.isConnected()) {
+        fetchWeather();
+        spiReinitForTFT();
+    }
     drawWeatherScreen();
 }
 
@@ -515,13 +547,15 @@ bool weatherLoop(TFT_eSPI &tft) {
 
     if (key == 'r' || key == 'R') {
         nvsPutInt("wx_cached_at", 0);
-        loadWeatherData();
+        loadWeatherData();    // SD ops inside
+        spiReinitForTFT();
         drawWeatherScreen();
     }
 
     if (key == 'l' || key == 'L') {
         doSetLocation();
-        loadWeatherData();
+        loadWeatherData();    // SD ops inside
+        spiReinitForTFT();
         drawWeatherScreen();
     }
 

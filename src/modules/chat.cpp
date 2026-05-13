@@ -79,6 +79,8 @@ static ChatLine s_history[CHAT_HISTORY_SZ];
 static int      s_histCount = 0;
 static int      s_scrollOff = 0;
 static String   s_inputBuf  = "";
+static String   s_aiTarget  = "";
+static String   s_assist[2] = {"", ""};
 
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -217,7 +219,10 @@ static void drawChatTopbar() {
     } else {
         snprintf(title, sizeof(title), ">> %s", p->name);
     }
-    drawTopbar(*s_tft, title, "Q=home", COL_CYAN);
+    String tgt = s_aiTarget; tgt.toUpperCase();
+    char rightLabel[16];
+    snprintf(rightLabel, sizeof(rightLabel), "%s Q=home", tgt.c_str());
+    drawTopbar(*s_tft, title, rightLabel, COL_CYAN);
     drawStatusBar(*s_tft, WiFi.isConnected(), false, p->title[0] ? p->title : p->name, 0);
 }
 
@@ -239,8 +244,13 @@ static void sendMessage(const String &msg) {
         pushLine("ERR: no URL. Type seturl", COL_SYS);
         scrollToBottom(); return;
     }
+    if (s_aiTarget.isEmpty()) {
+        if (s_histCount > 0 && s_history[s_histCount-1].text == "...") s_histCount--;
+        pushLine("ERR: no assistant. Type setassist1", COL_SYS);
+        scrollToBottom(); return;
+    }
 
-    String endpoint = base + "/simple";
+    String endpoint = base + "/" + s_aiTarget + "/simple";
     bool   isHttps  = base.startsWith("https://");
 
     JsonDocument reqDoc;
@@ -287,7 +297,9 @@ static void sendMessage(const String &msg) {
         } else {
             String reply = stripMarkdown(res["response"].as<String>());
             ctxAdd(msg, reply);
-            pushWrapped(String(p->name) + ": ", reply, COL_CYAN);
+            String label = s_aiTarget.isEmpty() ? String(p->name) : s_aiTarget;
+            label.toUpperCase();
+            pushWrapped(label + ": ", reply, COL_CYAN);
         }
     } else {
         pushLine(code > 0 ? "ERR: HTTP " + String(code) : "ERR: connection failed", COL_SYS);
@@ -329,6 +341,9 @@ void chatInit(TFT_eSPI &tft) {
     s_histCount = 0;
     s_scrollOff = 0;
     s_inputBuf  = "";
+    s_assist[0] = nvsGetString("assist1", ""); s_assist[0].toLowerCase();
+    s_assist[1] = nvsGetString("assist2", ""); s_assist[1].toLowerCase();
+    s_aiTarget  = nvsGetString("ai_target", s_assist[0]); s_aiTarget.toLowerCase();
     ctxClear();
 
     tft.fillScreen(COL_BG);
@@ -337,7 +352,7 @@ void chatInit(TFT_eSPI &tft) {
 
     PersonaDef *p = personaMgrGet();
     pushLine(">> " + String(p->name) + (p->title[0] ? " - " + String(p->title) : ""), COL_CYAN);
-    pushLine("seturl setwifi persona clear", COL_SYS);
+    pushWrapped("", "seturl setwifi setassist1 setassist2 persona clear", COL_CYAN);
     redrawChatArea();
     redrawInput();
 }
@@ -358,6 +373,23 @@ bool chatLoop(TFT_eSPI &tft) {
         if (msg == "clear") {
             s_histCount = 0; s_scrollOff = 0; ctxClear();
             redrawChatArea(); redrawInput();
+        } else if (msg.startsWith("setassist1") || msg.startsWith("setassist2")) {
+            int idx = msg.startsWith("setassist1") ? 0 : 1;
+            String slug;
+            if (msg.length() > 10 && msg[10] == ' ') {
+                slug = msg.substring(11); slug.trim();
+            } else {
+                slug = readLine(idx == 0 ? "Assistant 1 slug:" : "Assistant 2 slug:");
+                slug.trim();
+                tft.fillScreen(COL_BG); drawChatTopbar();
+            }
+            if (slug.length() > 0) {
+                slug.toLowerCase();
+                s_assist[idx] = slug;
+                nvsPutString(idx == 0 ? "assist1" : "assist2", slug);
+                pushLine("Assist" + String(idx + 1) + ": " + slug, COL_SYS);
+            }
+            scrollToBottom(); redrawInput();
         } else if (msg == "persona") {
             switchPersona();
         } else if (msg == "seturl") {
@@ -385,8 +417,30 @@ bool chatLoop(TFT_eSPI &tft) {
             pushLine(WiFi.isConnected() ? "WiFi: " + WiFi.localIP().toString() : "WiFi failed.", COL_SYS);
             scrollToBottom(); redrawInput();
         } else if (msg.length() > 0) {
-            sendMessage(msg);
-            redrawInput();
+            // Check if msg matches a configured assistant slug
+            bool isSlug = false;
+            for (int i = 0; i < 2; i++) {
+                if (s_assist[i].length() > 0 && msg.equalsIgnoreCase(s_assist[i])) {
+                    if (!s_aiTarget.equalsIgnoreCase(s_assist[i])) {
+                        s_aiTarget = s_assist[i];
+                        nvsPutString("ai_target", s_aiTarget);
+                        ctxClear();
+                        String disp = s_aiTarget; disp.toUpperCase();
+                        pushLine(">> " + disp, COL_CYAN);
+                        drawChatTopbar();
+                    } else {
+                        String disp = s_aiTarget; disp.toUpperCase();
+                        pushLine("Already on " + disp, COL_SYS);
+                    }
+                    scrollToBottom(); redrawInput();
+                    isSlug = true;
+                    break;
+                }
+            }
+            if (!isSlug) {
+                sendMessage(msg);
+                redrawInput();
+            }
         }
     } else if (key == 8 || key == 127) {
         if (s_inputBuf.length() > 0) s_inputBuf.remove(s_inputBuf.length() - 1);

@@ -165,7 +165,6 @@ static bool fetchFires() {
     WiFiClientSecure cl;
     cl.setInsecure();
     HTTPClient http;
-    http.useHTTP10(true);
     http.begin(cl,
         "https://eonet.gsfc.nasa.gov/api/v3/events"
         "?category=wildfires&status=open&limit=12");
@@ -174,15 +173,15 @@ static bool fetchFires() {
 
     int code = http.GET();
     if (code != 200) { http.end(); return false; }
+    String body = http.getString();
+    http.end();
 
     JsonDocument filt;
-    filt["events"][0]["title"]                   = true;
-    filt["events"][0]["geometry"][0]["date"]     = true;
+    filt["events"][0]["title"]               = true;
+    filt["events"][0]["geometry"][0]["date"] = true;
 
     JsonDocument doc;
-    WiFiClient *stream = http.getStreamPtr();
-    DeserializationError err = deserializeJson(doc, *stream, DeserializationOption::Filter(filt));
-    http.end();
+    DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filt));
     if (err) return false;
 
     JsonArray events = doc["events"].as<JsonArray>();
@@ -335,6 +334,9 @@ void worldInit(TFT_eSPI &tft) {
     if (!cacheFresh(s_quakeFetchedAt, s_quakeCount)) {
         tft.fillScreen(COL_BG);
         drawTopbar(tft, "< HOME | USGS", "", COL_CYAN);
+        tft.setTextFont(FONT_SMALL);
+        tft.setTextColor(COL_CYAN, COL_BG);
+        tft.drawCentreString("Fetching USGS data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
         if (WiFi.isConnected()) fetchQuakes();
         updateSyncStr();
     }
@@ -348,6 +350,9 @@ void worldInitFires(TFT_eSPI &tft) {
     if (!cacheFresh(s_fireFetchedAt, s_fireCount)) {
         tft.fillScreen(COL_BG);
         drawTopbar(tft, "< HOME | FIRES", "", COL_CYAN);
+        tft.setTextFont(FONT_SMALL);
+        tft.setTextColor(COL_CYAN, COL_BG);
+        tft.drawCentreString("Fetching fire data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
         if (WiFi.isConnected()) fetchFires();
         updateSyncStr();
     }

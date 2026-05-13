@@ -3,6 +3,7 @@
 #include "../ui/widgets.h"
 #include "../config/nvs_config.h"
 #include <Wire.h>
+#include <SPI.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -346,6 +347,15 @@ static void drawSparkline(int x, int y, int w, int h, const CoinData &c) {
 }
 
 // ── Screen drawing ────────────────────────────────────────────────────────────
+// After SD.end() the SPI bus can be left in a state the TFT doesn't accept.
+// Explicitly deassert SD CS and re-issue a TFT-speed SPI transaction so the
+// next fillScreen / drawXxx works reliably (mirrors world.cpp which has no SD).
+static void spiReinitForTFT() {
+    digitalWrite(BOARD_SDCARD_CS, HIGH);
+    SPI.beginTransaction(SPISettings(40000000, MSBFIRST, SPI_MODE0));
+    SPI.endTransaction();
+}
+
 static void drawBtcScreen() {
     s_tft->fillScreen(COL_BG);
 
@@ -405,9 +415,8 @@ static void drawBtcScreen() {
     int contentH = SCREEN_H - contentY - 14;  // 14 = hint bar
     int rowH     = contentH / s_coinCount;
 
-    // Clear full content area — previous NO DATA text sits in this zone and
-    // fillScreen at the top of this function alone doesn't always cover it.
-    s_tft->fillRect(0, contentY, SCREEN_W, contentH, COL_BG);
+    // fillScreen is unreliable after SD SPI ops — secondary fillRect clears what it missed.
+    s_tft->fillRect(0, contentY, SCREEN_W, SCREEN_H - contentY, COL_BG);
 
     // Compact list mode for SD/NVS coin watchlists larger than two coins.
     if (s_coinCount > 2) {
@@ -454,9 +463,12 @@ static void drawBtcScreen() {
             s_tft->drawString("7D", 252, ry + 16);
         }
 
+        int ya = SCREEN_H - BOTTOMBAR_H;
+        s_tft->drawFastHLine(0, ya, SCREEN_W, COL_CYAN);
+        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(COL_CYAN, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+        s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, ya + 3, FONT_SMALL);
         return;
     }
     for (int i = 0; i < s_coinCount; i++) {
@@ -535,9 +547,12 @@ static void drawBtcScreen() {
     }
 
     // ── Hint bar ─────────────────────────────────────────────────────────────
+    int ya = SCREEN_H - BOTTOMBAR_H;
+    s_tft->drawFastHLine(0, ya, SCREEN_W, COL_CYAN);
+    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, COL_CYAN);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_CYAN, COL_BG);
-    s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+    s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, ya + 3, FONT_SMALL);
 }
 
 // ── Coin picker ───────────────────────────────────────────────────────────────
@@ -578,23 +593,43 @@ static void doCoinPicker() {
 // -- Public API ────────────────────────────────────────────────────────────────
 void btcInit(TFT_eSPI &tft) {
     s_tft = &tft;
-    tft.fillScreen(COL_BG);   // clear home screen immediately before any SD/net ops
     strlcpy(s_syncTime, "--:--", sizeof(s_syncTime));
-    loadCoinIds();
     for (int i = 0; i < COIN_MAX; i++) s_coins[i].valid = false;
+    s_fromCache = false;
 
-    // Try SD cache first so we never show NO DATA before the network fetch
+    // Show loading screen BEFORE any SD operations so the TFT clear runs
+    // while the SPI bus is in a known TFT state (mirrors world.cpp pattern).
+    tft.fillScreen(COL_BG);
+    drawTopbar(tft, "< HOME | CRYPTO", "", COL_CYAN);
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(COL_CYAN, COL_BG);
+    tft.drawCentreString("Fetching crypto data...", SCREEN_W / 2, SCREEN_H / 2, FONT_SMALL);
+
+    // SD ops: read coin list + check cache
+    loadCoinIds();
     String cachedJson;
-    bool hadCache = loadCacheFromSD(cachedJson) && parseCoinsJson(cachedJson);
-    s_fromCache = hadCache;
+    bool cacheHit = loadCacheFromSD(cachedJson) && parseCoinsJson(cachedJson);
+    if (cacheHit) s_fromCache = true;
 
-    // Show whatever we have immediately (cached data or NO DATA) with no loading overlay
-    drawBtcScreen();
+    // Restore SPI for TFT after SD operations
+    spiReinitForTFT();
 
-    if (WiFi.isConnected()) {
-        if (fetchCoins()) fetchFearGreed();
-        drawBtcScreen();  // Refresh with live data
+    if (cacheHit) {
+        drawBtcScreen();
+        if (WiFi.isConnected()) {
+            if (fetchCoins()) fetchFearGreed();  // fetchCoins → saveCacheToSD → SD ops
+            spiReinitForTFT();
+            drawBtcScreen();
+        }
+        return;
     }
+
+    // No cache — fetch live, then draw
+    if (WiFi.isConnected()) {
+        if (fetchCoins()) fetchFearGreed();  // fetchCoins → saveCacheToSD → SD ops
+        spiReinitForTFT();
+    }
+    drawBtcScreen();
 }
 
 bool btcLoop(TFT_eSPI &tft) {
@@ -605,13 +640,15 @@ bool btcLoop(TFT_eSPI &tft) {
 
     if (key == 'r' || key == 'R') {
         nvsPutInt("btc_cached_at", 0);
-        loadData();
+        loadData();       // SD ops inside
+        spiReinitForTFT();
         drawBtcScreen();
     }
 
     if (key == 'c' || key == 'C') {
         doCoinPicker();
-        loadData();
+        loadData();       // SD ops inside
+        spiReinitForTFT();
         drawBtcScreen();
     }
 
