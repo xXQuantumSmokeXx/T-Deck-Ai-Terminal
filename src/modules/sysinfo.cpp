@@ -12,7 +12,8 @@
 #define KB_ADDR          0x55
 #define BOARD_BL_PIN     42
 #define BL_PWM_CHANNEL   0
-#define FW_VERSION       "v1.1.2"
+#define FW_VERSION       "v1.1.3"
+#define FW_DESC          "Theme Support"
 
 // ── Data model ────────────────────────────────────────────────────────────────
 struct SysInfo {
@@ -395,6 +396,10 @@ static void drawSysinfoScreen() {
     y += 11;
     drawLabel(4, y, "THEME");
     drawValue(50, y, themeColorName(), g_themeColor);
+
+    y += 11;
+    drawLabel(4, y, "DESC");
+    drawValue(42, y, FW_DESC);
 
     y += 11;
     // Current UTC time (read from NTP)
