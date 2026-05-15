@@ -116,11 +116,18 @@ static volatile int  s_tbLeft  = 0;
 static volatile int  s_tbRight = 0;
 static volatile bool s_tbClick = false;
 
-void IRAM_ATTR isrTbUp()    { s_tbUp++; }
-void IRAM_ATTR isrTbDown()  { s_tbDown++; }
-void IRAM_ATTR isrTbLeft()  { s_tbLeft++; }
-void IRAM_ATTR isrTbRight() { s_tbRight++; }
-void IRAM_ATTR isrTbClick() { s_tbClick = true; }
+#define TB_DEBOUNCE_MS 12
+static volatile uint32_t s_tbLastUp    = 0;
+static volatile uint32_t s_tbLastDown  = 0;
+static volatile uint32_t s_tbLastLeft  = 0;
+static volatile uint32_t s_tbLastRight = 0;
+static volatile uint32_t s_tbLastClick = 0;
+
+void IRAM_ATTR isrTbUp()    { uint32_t n = millis(); if (n - s_tbLastUp    > TB_DEBOUNCE_MS) { s_tbLastUp    = n; s_tbUp++;    } }
+void IRAM_ATTR isrTbDown()  { uint32_t n = millis(); if (n - s_tbLastDown  > TB_DEBOUNCE_MS) { s_tbLastDown  = n; s_tbDown++;  } }
+void IRAM_ATTR isrTbLeft()  { uint32_t n = millis(); if (n - s_tbLastLeft  > TB_DEBOUNCE_MS) { s_tbLastLeft  = n; s_tbLeft++;  } }
+void IRAM_ATTR isrTbRight() { uint32_t n = millis(); if (n - s_tbLastRight > TB_DEBOUNCE_MS) { s_tbLastRight = n; s_tbRight++; } }
+void IRAM_ATTR isrTbClick() { uint32_t n = millis(); if (n - s_tbLastClick > TB_DEBOUNCE_MS) { s_tbLastClick = n; s_tbClick = true; } }
 
 static void drainTrackball(int &up, int &down, int &left, int &right) {
     up = 0;
@@ -145,23 +152,20 @@ static void handleHomeTrackball() {
     if (right) homeNavLeft(tft);
 }
 
-static bool handleScreenTrackball() {
+static void handleScreenTrackball() {
     int up, down, left, right;
     drainTrackball(up, down, left, right);
 
     if (s_screen == SCR_CHAT) {
-        for (int i = 0; i < up;   i++) chatTrackballUp();
-        for (int i = 0; i < down; i++) chatTrackballDown();
+        if (up)   chatTrackballUp();
+        if (down) chatTrackballDown();
     } else if (s_screen == SCR_ALERTS) {
-        for (int i = 0; i < up;   i++) noaaTrackballUp();
-        for (int i = 0; i < down; i++) noaaTrackballDown();
+        if (up)   noaaTrackballUp();
+        if (down) noaaTrackballDown();
     } else if (s_screen == SCR_WORLD) {
-        for (int i = 0; i < up;   i++) worldTrackballUp();
-        for (int i = 0; i < down; i++) worldTrackballDown();
+        if (up)   worldTrackballUp();
+        if (down) worldTrackballDown();
     }
-
-    // On module screens, rolling left backs out to the launcher.
-    return right > 0;
 }
 
 // ── Return to home ────────────────────────────────────────────────────────────
@@ -174,30 +178,48 @@ static void returnHome() {
 // ── Launch a tile ─────────────────────────────────────────────────────────────
 static void launchTile(TileID id) {
     switch (id) {
-        case TILE_CHAT:
+        case TILE_CHAT: {
             s_screen = SCR_CHAT;
             chatInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
-        case TILE_WEATHER:
+        }
+        case TILE_WEATHER: {
             s_screen = SCR_WEATHER;
             weatherInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
-        case TILE_SOLAR:
+        }
+        case TILE_SOLAR: {
             s_screen = SCR_SOLAR;
             solarInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
-        case TILE_BTC:
+        }
+        case TILE_BTC: {
             s_screen = SCR_BTC;
             btcInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
-        case TILE_SYSINFO:
+        }
+        case TILE_SYSINFO: {
             s_screen = SCR_SYSINFO;
             sysinfoInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
-        case TILE_ALERTS:
+        }
+        case TILE_ALERTS: {
             s_screen = SCR_ALERTS;
             noaaInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during init
             break;
+        }
         case TILE_WORLD: {
             s_screen = SCR_WORLD;
             worldInit(tft);
@@ -382,35 +404,35 @@ void loop() {
         delay(20);
 
     } else if (s_screen == SCR_CHAT) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!chatLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_WEATHER) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!weatherLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_SOLAR) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!solarLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_BTC) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!btcLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_SYSINFO) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!sysinfoLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_ALERTS) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!noaaLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_WORLD) {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (!worldLoop(tft)) returnHome();
 
     } else {
-        if (handleScreenTrackball()) { returnHome(); return; }
+        handleScreenTrackball();
         if (readKeyboard() != 0) returnHome();
         delay(20);
     }

@@ -73,14 +73,36 @@ inline void drawStatusBar(TFT_eSPI &tft, bool wifiOk, bool loraOk, const char *c
 inline int readTDeckBatteryMv() {
 #if defined(ARDUINO_ARCH_ESP32)
     static bool adcReady = false;
+    static uint32_t lastReadMs = 0;
+    static int cachedMv = -1;
     if (!adcReady) {
         analogReadResolution(12);
         analogSetPinAttenuation(TDECK_BAT_ADC_PIN, ADC_11db);
         adcReady = true;
     }
-    uint32_t mv = analogReadMilliVolts(TDECK_BAT_ADC_PIN);
-    if (mv < 100) return -1;
-    return (int)(mv * 2);
+    uint32_t now = millis();
+    if (now - lastReadMs < 5000 && cachedMv >= 0) return cachedMv;
+    lastReadMs = now;
+
+    // Average 8 samples and discard outliers to reject trackball noise.
+    uint32_t samples[8];
+    for (int i = 0; i < 8; i++) samples[i] = analogReadMilliVolts(TDECK_BAT_ADC_PIN);
+    // simple bubble sort to find min/max
+    for (int i = 0; i < 7; i++) {
+        for (int j = i + 1; j < 8; j++) {
+            if (samples[j] < samples[i]) {
+                uint32_t tmp = samples[i];
+                samples[i] = samples[j];
+                samples[j] = tmp;
+            }
+        }
+    }
+    uint32_t sum = 0;
+    for (int i = 2; i < 6; i++) sum += samples[i];  // discard 2 lowest, 2 highest
+    uint32_t avg = sum / 4;
+    if (avg < 100) { cachedMv = -1; return -1; }
+    cachedMv = (int)(avg * 2);
+    return cachedMv;
 #else
     return -1;
 #endif
