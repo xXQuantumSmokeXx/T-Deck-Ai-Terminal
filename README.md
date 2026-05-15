@@ -18,9 +18,9 @@ Built by Commander Smoke, with development assistance from Codex.
 | --- | --- | --- |
 | ![Log screen](images/T-Deck-Display/Log.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
 
-| USGS | System |
-| --- | --- |
-| ![USGS screen](images/T-Deck-Display/USGS.png) | ![System screen](images/T-Deck-Display/System.png) |
+| USGS | System | Home (Theme) |
+| --- | --- | --- |
+| ![USGS screen](images/T-Deck-Display/USGS.png) | ![System screen](images/T-Deck-Display/System.png) | ![Home themed](images/T-Deck-Display/Home-Theme.png) |
 
 ## Features
 
@@ -195,7 +195,7 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 ### SYSTEM
 
-- **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **Q**: home
+- **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **T**: open theme color picker — **Q**: home
 
 ## Data Sources
 
