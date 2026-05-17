@@ -109,9 +109,9 @@ static void redrawChatArea() {
 
 static void redrawInput() {
     PersonaDef *p = personaMgrGet();
-    s_tft->fillRect(0, CHAT_INPUT_Y, SCREEN_W, SCREEN_H - CHAT_INPUT_Y, COL_INPUT_BG);
+    s_tft->fillRect(0, CHAT_INPUT_Y, SCREEN_W, SCREEN_H - CHAT_INPUT_Y, COL_BG);
     s_tft->setTextFont(FONT_MED);
-    s_tft->setTextColor(g_themeColor, COL_INPUT_BG);
+    s_tft->setTextColor(g_themeColor, COL_BG);
     String display = "> " + s_inputBuf + "_";
     if (display.length() > 28) display = display.substring(display.length() - 28);
     s_tft->drawString(display, 2, CHAT_INPUT_Y + 4);

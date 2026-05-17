@@ -213,10 +213,10 @@ static bool appendLogLine(const String &entry) {
 
 static void drawInput() {
     int y = SCREEN_H - 22;
-    s_tft->fillRect(0, y, SCREEN_W, 22, COL_INPUT_BG);
+    s_tft->fillRect(0, y, SCREEN_W, 22, COL_BG);
     s_tft->drawFastHLine(0, y - 1, SCREEN_W, g_themeColor);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_INPUT_BG);
+    s_tft->setTextColor(g_themeColor, COL_BG);
     String display = s_editIndex >= 0 ? "E> " + s_input + "_" : "> " + s_input + "_";
     while (display.length() > 3 && s_tft->textWidth(display) > SCREEN_W - 4) display.remove(2, 1);
     s_tft->drawString(display, 2, y + 6);
@@ -259,10 +259,10 @@ static void drawLogScreen() {
             int ly = y + i * LOG_ROW_H;
             bool selected = i == s_selected;
             if (selected) {
-                s_tft->fillRect(0, ly - 1, SCREEN_W, LOG_ROW_H, COL_INPUT_BG);
+                s_tft->fillRect(0, ly - 1, SCREEN_W, LOG_ROW_H, COL_BG);
                 drawCornerBrackets(*s_tft, 1, ly - 1, SCREEN_W - 2, LOG_ROW_H, g_themeColor, 5);
             }
-            s_tft->setTextColor(g_themeColor, selected ? COL_INPUT_BG : COL_BG);
+            s_tft->setTextColor(g_themeColor, COL_BG);
             s_tft->drawString(fitText(s_lines[i].text, SCREEN_W - 12), 6, ly + 2);
             if (i < s_lineCount - 1) s_tft->drawFastHLine(0, ly + LOG_ROW_H - 1, SCREEN_W, g_themeColor);
         }

@@ -399,16 +399,19 @@ static void drawWeatherScreen() {
     // Condition text
     int y2 = y + 30;
     s_tft->setTextFont(FONT_MED);
-    s_tft->setTextColor(g_themeColor, COL_BG);
+    s_tft->setTextColor(COL_WHITE, COL_BG);
     s_tft->drawString(weatherDesc(s_wx.code), 6, y2);
 
-    // Feels like
+    // Feels like — label themed, temp value white
     int y3 = y2 + 18;
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(g_themeColor, COL_BG);
-    char flBuf[20];
-    snprintf(flBuf, sizeof(flBuf), "feels like %d F", (int)roundf(s_wx.feelsLikeF));
-    s_tft->drawString(flBuf, 6, y3);
+    s_tft->drawString("feels like ", 6, y3);
+    int flLabelW = s_tft->textWidth("feels like ");
+    char flTemp[10];
+    snprintf(flTemp, sizeof(flTemp), "%d F", (int)roundf(s_wx.feelsLikeF));
+    s_tft->setTextColor(COL_WHITE, COL_BG);
+    s_tft->drawString(flTemp, 6 + flLabelW, y3);
 
     // ── Stats row ─────────────────────────────────────────────────────────────
     int ys = y3 + 14;

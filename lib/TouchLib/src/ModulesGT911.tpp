@@ -74,11 +74,7 @@ public:
 
         this->writeRegister(GT911_COMMAND, (uint8_t)0x02); // software reset
         delay(200);
-        int val = readRegister(GT911_MODULE_SWITCH_1);
-        val &= 0XFC;
-        val |= 0x03;
-        this->writeRegister(GT911_MODULE_SWITCH_1, (uint8_t)val);
-        delay(200);
+        // Interrupt mode left to caller — initTouch() sets it via CONFIG_FRESH
         return  true;
     }
 
@@ -96,7 +92,12 @@ public:
     bool read()
     {
         this->readRegister(GT911_POINT_INFO, raw_data, sizeof(raw_data));
-        this->writeRegister(GT911_POINT_INFO, (uint8_t)0x00); // sync signal
+        // Only write the sync/clear when the buffer-ready bit (7) is set.
+        // Writing 0x00 unconditionally was sending spurious sync signals every
+        // poll cycle, confusing the GT911 state machine after the first read.
+        if (raw_data[0] & 0x80) {
+            this->writeRegister(GT911_POINT_INFO, (uint8_t)0x00);
+        }
         return (raw_data[0] & 0xF) != 0 ? true : false;
     }
 

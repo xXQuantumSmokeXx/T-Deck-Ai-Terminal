@@ -4,6 +4,7 @@
 #include <SD.h>
 #include <TFT_eSPI.h>
 #include <WebServer.h>
+#include <TouchLib.h>
 
 #include "ui/theme.h"
 #include "ui/home.h"
@@ -18,6 +19,17 @@
 #include "modules/sysinfo.h"
 #include "modules/noaa.h"
 #include "modules/world.h"
+
+// ── Touch ─────────────────────────────────────────────────────────────────────
+#define TOUCH_INT_PIN   16
+
+static TouchLib *s_touch      = nullptr;
+static bool      s_touchReady  = false;
+static bool      s_prevTouched = false;
+static uint16_t  s_tapX        = 0;
+static uint16_t  s_tapY        = 0;
+static uint32_t  s_lastTapMs   = 0;
+static uint32_t  s_touchDownMs = 0;
 
 // ── Board pins ────────────────────────────────────────────────────────────────
 #define BOARD_POWERON    10
@@ -168,11 +180,147 @@ static void handleScreenTrackball() {
     }
 }
 
+static void launchTile(TileID id);  // forward declaration
+
+// ── Touch init & home-screen tap handler ─────────────────────────────────────
+static void initTouch() {
+    pinMode(TOUCH_INT_PIN, INPUT_PULLUP);
+    delay(200);  // GT911 needs time to settle after power-on
+
+    // GT911 address depends on INT pin state at reset: probe both
+    const uint8_t candidates[] = {0x5D, 0x14};
+    uint8_t foundAddr = 0;
+    for (int i = 0; i < 2; i++) {
+        Wire.beginTransmission(candidates[i]);
+        if (Wire.endTransmission() == 0) { foundAddr = candidates[i]; break; }
+        delay(20);
+    }
+
+    if (foundAddr == 0) {
+        Serial.println("[Touch] GT911 not found on I2C");
+        return;
+    }
+
+    Serial.printf("[Touch] GT911 at 0x%02X\n", foundAddr);
+    s_touch = new TouchLib(Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, foundAddr);
+    s_touch->init();  // software reset; leaves interrupt mode at NVM default
+
+    // Set interrupt mode to falling-edge (0x01) with proper CONFIG_FRESH.
+    // Without CONFIG_FRESH the GT911 ignores the register write entirely.
+    // Wire receive buffer is ~128 bytes so read the 184-byte config in two chunks.
+    {
+        uint8_t cfg[184];
+
+        Wire.beginTransmission(foundAddr);
+        Wire.write(0x80); Wire.write(0x47);        // GT911_CONFIG_START
+        Wire.endTransmission(false);
+        Wire.requestFrom(foundAddr, (uint8_t)128);
+        for (int i = 0; i <  128; i++) cfg[i]       = Wire.available() ? Wire.read() : 0;
+
+        Wire.beginTransmission(foundAddr);
+        Wire.write(0x80); Wire.write(0xC7);        // 0x8047 + 128
+        Wire.endTransmission(false);
+        Wire.requestFrom(foundAddr, (uint8_t)56);
+        for (int i = 0; i <   56; i++) cfg[128 + i] = Wire.available() ? Wire.read() : 0;
+
+        // MODULE_SWITCH_1 is at 0x804D = offset 6 from 0x8047
+        cfg[6] = (cfg[6] & 0xFC) | 0x01;           // falling-edge mode
+
+        // Write patched register
+        Wire.beginTransmission(foundAddr);
+        Wire.write(0x80); Wire.write(0x4D);
+        Wire.write(cfg[6]);
+        Wire.endTransmission();
+
+        // Recompute checksum (two's complement of byte-sum of cfg[0..183])
+        uint8_t sum = 0;
+        for (int i = 0; i < 184; i++) sum += cfg[i];
+        uint8_t chk = (~sum) + 1;
+
+        Wire.beginTransmission(foundAddr);
+        Wire.write(0x80); Wire.write(0xFF);        // GT911_CONFIG_CHKSUM
+        Wire.write(chk);
+        Wire.endTransmission();
+
+        Wire.beginTransmission(foundAddr);
+        Wire.write(0x81); Wire.write(0x00);        // GT911_CONFIG_FRESH
+        Wire.write((uint8_t)0x01);
+        Wire.endTransmission();
+
+        delay(100);
+        Serial.printf("[Touch] INT mode=falling-edge chk=0x%02X\n", chk);
+    }
+
+    s_touch->setRotation(1);
+    s_touchReady = true;
+    Serial.println("[Touch] ready");
+}
+
+// Flush GT911 state when (re-)entering home screen.
+static void touchDrain() {
+    if (s_touch && s_touchReady) s_touch->read();  // consume any pending data
+    s_prevTouched = false;
+    s_tapX = 0;
+    s_tapY = 0;
+    s_touchDownMs = 0;
+    s_lastTapMs = millis();  // 300 ms block against ghost taps on re-entry
+}
+
+static void handleHomeTouch() {
+    if (!s_touch || !s_touchReady) return;
+
+    // Safety: un-stick prevTouched if GT911 misses its lift report (~1 s timeout)
+    if (s_prevTouched && s_touchDownMs && (millis() - s_touchDownMs > 1000)) {
+        s_prevTouched = false;
+        s_touchDownMs = 0;
+    }
+
+    // GT911 in falling-edge mode: INT is held LOW while unread data exists.
+    // Only call read() when INT is LOW — prevents spurious 0x00 sync writes
+    // that confuse the chip between events.
+    if (digitalRead(TOUCH_INT_PIN) != LOW) return;
+
+    bool touched = s_touch->read() && s_touch->getPointNum() > 0;
+
+    if (touched) {
+        TP_Point p = s_touch->getPoint(0);
+        if (p.x < SCREEN_W && p.y < SCREEN_H) {
+            s_tapX = p.x;
+            s_tapY = (SCREEN_H - 1) - p.y;  // GT911 Y is mirrored on T-Deck
+            s_touchDownMs = millis();
+        } else {
+            touched = false;
+        }
+    }
+
+    // Fire on finger-lift (GT911 sends 0-point report on release → read() returns false)
+    if (!touched && s_prevTouched) {
+        s_touchDownMs = 0;
+        Serial.printf("[Touch] tap x=%d y=%d\n", s_tapX, s_tapY);
+        if (s_tapY >= CONTENT_Y && s_tapY < (uint16_t)(SCREEN_H - BOTTOMBAR_H)) {
+            int col = s_tapX / TILE_W;
+            int row = (s_tapY - CONTENT_Y) / TILE_H;
+            if (col < TILE_COLS && row < TILE_ROWS) {
+                uint32_t now = millis();
+                if (now - s_lastTapMs > 300) {
+                    s_lastTapMs = now;
+                    s_prevTouched = false;
+                    launchTile((TileID)(row * TILE_COLS + col));
+                    return;
+                }
+            }
+        }
+    }
+
+    s_prevTouched = touched;
+}
+
 // ── Return to home ────────────────────────────────────────────────────────────
 static void returnHome() {
     if (s_screen == SCR_CHAT) chatExit();
     s_screen = SCR_HOME;
     homeInit(tft);
+    touchDrain();
 }
 
 // ── Launch a tile ─────────────────────────────────────────────────────────────
@@ -358,6 +506,7 @@ void setup() {
 
     SPI.begin(BOARD_SPI_SCK, BOARD_SPI_MISO, BOARD_SPI_MOSI);
     Wire.begin(BOARD_I2C_SDA, BOARD_I2C_SCL);
+    initTouch();
 
     tft.begin();
     tft.setRotation(1);
@@ -378,6 +527,7 @@ void setup() {
     personaMgrInit();
 
     homeInit(tft);
+    touchDrain();
 }
 
 // ── loop ──────────────────────────────────────────────────────────────────────
@@ -386,6 +536,8 @@ void loop() {
 
     if (s_screen == SCR_HOME) {
         handleHomeTrackball();
+        handleHomeTouch();
+        if (s_screen != SCR_HOME) return;  // touch launched a tile
 
         bool clicked = false;
         noInterrupts();

@@ -86,12 +86,8 @@ static void msToWhen(long long ms, char *out, int outLen) {
     time_t t = (time_t)(ms / 1000LL);
     struct tm *ti = gmtime(&t);
     if (ti) {
-        int h = ti->tm_hour;
-        const char *ap = h >= 12 ? "PM" : "AM";
-        if (h > 12) h -= 12;
-        else if (h == 0) h = 12;
-        snprintf(out, outLen, "%02d-%02d %d:%02d%s",
-                 ti->tm_mon + 1, ti->tm_mday, h, ti->tm_min, ap);
+        snprintf(out, outLen, "%02d-%02d %02d:%02d",
+                 ti->tm_mon + 1, ti->tm_mday, ti->tm_hour, ti->tm_min);
     } else {
         strlcpy(out, "--", (size_t)outLen);
     }

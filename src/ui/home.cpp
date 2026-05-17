@@ -178,7 +178,7 @@ static void drawTile(TFT_eSPI &tft, int idx, bool selected) {
 
     // Label
     tft.setTextFont(FONT_SMALL);
-    tft.setTextColor(g_themeColor, COL_BG);
+    tft.setTextColor(COL_WHITE, COL_BG);
     int labelW = tft.textWidth(TILES[idx].label);
     tft.drawString(TILES[idx].label, x + (w - labelW) / 2, y + h - 18);
 
