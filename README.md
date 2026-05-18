@@ -1,6 +1,6 @@
 # MayDay T-Deck AI Terminal
 
-A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, SHTF situational awareness, local hazard and traffic monitoring via Waze, and system diagnostics.
+A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, scripture and reference reading, wildfire and USGS earthquake feeds, SHTF situational awareness, local hazard and traffic monitoring via Waze, and system diagnostics.
 
 Built by Commander Smoke, with development assistance from Codex.
 
@@ -14,9 +14,9 @@ Built by Commander Smoke, with development assistance from Codex.
 | --- | --- | --- |
 | ![AI Chat screen](images/T-Deck-Display/Ai-Chat.png) | ![Weather screen](images/T-Deck-Display/Weather.png) | ![Solar screen](images/T-Deck-Display/Solar.png) |
 
-| Log | Crypto | Fires |
+| CODEX | Crypto | Fires |
 | --- | --- | --- |
-| ![Log screen](images/T-Deck-Display/Log.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
+| ![CODEX screen](images/T-Deck-Display/Log.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
 
 | USGS | System | Home (Theme) |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ Built by Commander Smoke, with development assistance from Codex.
 - **AI CHAT** — SD-loaded personas, named assistants, HTTP backend with full conversation context
 - **WEATHER** — Open-Meteo forecast with user-configured latitude and longitude, 5-day strip, stats row
 - **SOLAR** — NOAA/SWPC space weather: Kp history, 48h forecast, Bz, solar wind speed, flares, and CME data
-- **LOG** — Field notes written to SD card with add, select, edit, and delete support
+- **CODEX** — Dual-mode hub: **MY LOGS** (field notes on SD card, add/edit/delete with trackball cursor navigation) and **LIBRARY** (KJV scripture reader and other SD-hosted books with chapter index and paragraph-reflowed text)
 - **CRYPTO** — Up to six CoinGecko favorites, 24h/7d movement, 7-day sparklines, and Fear & Greed index
 - **FIRES** — NASA EONET open wildfire events, live feed
 - **USGS** — Recent M3.5+ earthquake feed from USGS FDSNWS
@@ -37,21 +37,23 @@ Built by Commander Smoke, with development assistance from Codex.
 - **ROAD** — Nearby Waze road closures and traffic jams within 2 km
 - **SYSTEM** — Device, WiFi, SD, heap, uptime, backend, persona status, and brightness control
 - All data screens NVS-cache their last successful fetch for instant load and offline resilience
-- Cyan terminal aesthetic tuned for the T-Deck 320×240 display
+- Consistent themed bottom bar across all screens — two border lines, all-caps shortcuts, no dividers
+- Date display (day of week, month, day, year) in the home status bar when NTP is synced
+- Custom Quantum Smoke splash logo on boot
 
 ## Hardware Required
 
 - LILYGO T-Deck, ESP32-S3 version
-- microSD card for WiFi bootstrap, personas, cache, and field logs
+- microSD card for WiFi bootstrap, personas, cache, field logs, and library books
 - WiFi network for AI backend, weather, solar, crypto, fire/quake feeds, and NTP sync
 
 ## Flashing
 
 **Option 1 — M5Launcher (SD card, no USB required):**
 
-1. Grab `AiTerminal.bin` from the [latest release](https://github.com/xXQuantumSmokeXx/T-Deck-Ai-Terminal/releases/latest) and copy it to your SD card root.
+1. Grab `Ai-Field-Terminal.bin` from the [latest release](https://github.com/xXQuantumSmokeXx/T-Deck-Ai-Terminal/releases/latest) and copy it to your SD card root.
 2. Boot into M5Launcher on the T-Deck.
-3. Select `AiTerminal.bin` and flash.
+3. Select `Ai-Field-Terminal.bin` and flash.
 
 **Option 2 — Build and flash from source:**
 
@@ -66,7 +68,7 @@ Or build the binary and copy it to SD for M5Launcher:
 
 ```sh
 pio run
-copy .pio\build\T-Deck\firmware.bin F:\AiTerminal.bin
+copy .pio\build\T-Deck\firmware.bin F:\Ai-Field-Terminal.bin
 ```
 
 ## SD Card Setup
@@ -152,9 +154,13 @@ It can span multiple lines.
 
 Slot 1 has a built-in fallback if `/personas/p1.txt` is missing. Slots 2 and 3 load only when their files are present. Type `persona` in AI CHAT to cycle slots. Type `setassist1` or `setassist2` to configure the display name shown in the chat header for each slot.
 
-### Field Logs
+### MY LOGS (CODEX)
 
-The LOG screen writes entries to `/logs/field.log`. The firmware creates this file automatically. Keep the SD card inserted for LOG to work.
+The CODEX MY LOGS screen writes field notes to `/logs/field.log`. The firmware creates this file automatically. Keep the SD card inserted for MY LOGS to work. Use the trackball to move the selection cursor, then press **E** to edit or **D** to delete the selected entry.
+
+### LIBRARY (CODEX)
+
+Place plain text books in the SD card root. The firmware auto-indexes them on first open and caches the chapter index in a binary `.idx` file. The KJV Bible (`kjv.txt`) is the primary supported title — Gutenberg-format plain text works out of the box with paragraph reflow to fix the 70-character line wrapping. Any plain-text book with consistent blank-line-separated chapter headings will index correctly.
 
 ### Crypto Favorites
 
@@ -199,6 +205,24 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 | `persona` | Cycle loaded persona slot |
 | `clear` | Clear chat history and context |
 
+### CODEX — MY LOGS
+
+| Input | Action |
+| --- | --- |
+| Type + Enter | Add a new log entry |
+| Trackball up/down | Move selection cursor |
+| E | Edit selected entry |
+| D | Delete selected entry |
+| Del / Backspace | Return to home |
+
+### CODEX — LIBRARY
+
+| Input | Action |
+| --- | --- |
+| Trackball up/down | Scroll page / navigate chapter list |
+| Enter | Open selected chapter |
+| Q / Backspace | Back / return to home |
+
 ### WEATHER
 
 - **R**: refresh — **L**: set latitude/longitude — **Q**: home
@@ -224,7 +248,7 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 ### SYSTEM
 
-- **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **T**: open theme color picker — **Q**: home
+- **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **T**: open theme color picker — **D**: edit display name — **Q**: home
 
 ## Data Sources
 
@@ -237,7 +261,8 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 | USGS | USGS FDSNWS earthquake feed |
 | SHTF | NWS active alerts + FEMA declared disasters + USGS significant earthquakes (fallback) + CDC/ProMED RSS |
 | HAZARD / POLICE / ROAD | OpenWebNinja Waze API (requires `waze.txt` key on SD) |
-| LOG | Local SD card `/logs/field.log` |
+| CODEX MY LOGS | Local SD card `/logs/field.log` |
+| CODEX LIBRARY | Local SD card plain text books |
 | SYSTEM | Local ESP32-S3 state |
 
 All data screens NVS-cache their last successful fetch so they display instantly on re-open and stay useful during brief offline periods. Press **R** on any data screen to force a fresh fetch.
@@ -245,13 +270,14 @@ All data screens NVS-cache their last successful fetch so they display instantly
 ## Project Layout
 
 ```txt
-src/main.cpp              Boot flow, screen router, trackball and keyboard handling
-src/ui/                   Theme constants, home launcher, shared widgets
+src/main.cpp              Boot flow, splash logo, screen router, trackball and keyboard handling
+src/ui/                   Theme constants, home launcher, shared widgets (drawMenuBar, drawTopbar, etc.)
 src/modules/chat.*        AI chat client, persona context, command handling
 src/modules/weather.*     Weather dashboard and location configuration
 src/modules/solar.*       Solar / space-weather dashboard
 src/modules/btc.*         Crypto dashboard and CoinGecko favorites
-src/modules/noaa.*        Field LOG module
+src/modules/noaa.*        CODEX hub — MY LOGS field notes and LIBRARY book reader router
+src/modules/scripture.*   LIBRARY — SD book indexer, chapter browser, paragraph-reflowed reader
 src/modules/world.*       FIRES and USGS earthquake feeds
 src/modules/shtf.*        SHTF monitor: NWS + FEMA + bio feeds + threat index
 src/modules/waze.*        Waze hazard / police / road screens (three modes, shared module)
@@ -260,6 +286,16 @@ src/net/wifi_mgr.*        WiFi credential handling and NVS storage
 src/persona/              SD persona loader and slot manager
 sd_card/                  Example SD card layout and setup files
 ```
+
+## v1.1.8 Changes
+
+- **CODEX** hub replaces LOG — dual-mode screen combining **MY LOGS** (field notes) and **LIBRARY** (SD-hosted book reader)
+- **MY LOGS** — trackball now moves selection cursor (not scroll offset), enabling in-place edit and delete; status bar shows context-sensitive shortcuts (`E=EDIT  D=DEL  DEL=BACK`)
+- **LIBRARY** — KJV scripture reader with auto-generated chapter index, proximity-merge deduplication of Gutenberg dual headers, paragraph reflow to fix 70-char line wrapping, and FONT_MED display for readability
+- **Splash screen** redesign — larger text with Quantum Smoke sigil (double-stroked hexagon, inner diamond, crosshair ticks, smoke wisps, xX marks)
+- **Date in home status bar** — day of week, month, day, year displayed right-aligned in theme color when NTP is synced
+- **Consistent bottom bar** across all module screens — two horizontal border lines, all-caps shortcuts, no vertical dividers, `drawMenuBar()` shared widget used everywhere
+- **Bin renamed** to `Ai-Field-Terminal.bin` for M5Launcher installs
 
 ## v1.1.7 Changes
 
@@ -270,14 +306,6 @@ sd_card/                  Example SD card layout and setup files
 - SHTF threat index bars now render in the active theme color
 - Boot screen "Connecting to WiFi" and "Syncing time" text now renders in theme color
 - Waze API key loaded from `waze.txt` on SD card (see SD Card Setup)
-
-## v1.1.1 Changes
-
-- Trackball click (press ball down) now launches the selected home tile
-- Assistant display names in chat driven by `setassist1` / `setassist2` instead of defaulting to persona name
-- Fixed screen bleedthrough on CRYPTO and WEATHER after SD card SPI operations
-- Fixed FIRES showing No Data on first load due to stream-parse timing
-- Restored bottom hint bar borders on CRYPTO screen
 
 ## Security Notes
 

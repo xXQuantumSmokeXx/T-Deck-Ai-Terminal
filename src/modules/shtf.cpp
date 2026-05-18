@@ -17,19 +17,19 @@
 #define GPS_BAUD          9600
 #define GPS_TIMEOUT_MS    60000
 
-#define NWS_SLOTS         2    // max NWS alerts to fetch
+#define NWS_SLOTS         3    // max NWS alerts to fetch
 #define FEMA_SLOTS        3    // max FEMA declarations to fetch
 #define DISASTER_MAX      (NWS_SLOTS + FEMA_SLOTS)
-#define DISASTER_DISPLAY  3    // rows shown (NWS-first, then FEMA)
+#define DISASTER_DISPLAY  4    // rows shown (NWS-first, then FEMA)
 #define BIO_MAX           9
-#define BIO_VISIBLE       BIO_MAX
+#define BIO_VISIBLE       7
 #define SHTF_CACHE_TTL    1800  // 30 minutes
 
 // ── State ──────────────────────────────────────────────────────────────────────
 struct DisasterItem {
     char    src[6];    // "NWS" or "FEMA"
-    char    event[22]; // "Tornado Warning" / "Hurricane"
-    char    detail[6]; // severity "EXT"/"SVR"/"MOD" or date "MM/DD"
+    char    event[36]; // "Tornado Warning" / "Hurricane"
+    char    detail[14]; // severity "EXT"/"SVR"/"MOD" or state "TX" or "Earth-Quake"
     bool    critical;  // true = red dot, false = amber
 };
 struct BioItem {
@@ -297,7 +297,7 @@ static void fetchUSGS() {
         DisasterItem &item = s_disasters[s_disasterCount];
         strlcpy(item.src, "USGS", sizeof(item.src));
         snprintf(item.event, sizeof(item.event), "M%.1f %s", mag, place);
-        strlcpy(item.detail, "QUAKE", sizeof(item.detail));
+        strlcpy(item.detail, "(QUAKE)", sizeof(item.detail));
         item.critical = (mag >= 6.0f || strcmp(alert, "red") == 0 || strcmp(alert, "orange") == 0);
         s_disasterCount++;
         added++;
@@ -469,9 +469,10 @@ static void drawThreatBar(int y, const char *label, uint8_t score) {
 
     int barX = 4 + s_tft->textWidth(label) + 6;
     int barW = SCREEN_W - barX - 26, barH = 8;
-    int fill = (int)(score * barW / 100);
-    s_tft->fillRect(barX, y, fill, barH, g_themeColor);
-    s_tft->fillRect(barX + fill, y, barW - fill, barH, COL_GREY_DIM);
+    int fill = (int)(score * (barW - 2) / 100);
+    s_tft->fillRect(barX, y, barW, barH, COL_BG);
+    s_tft->drawRect(barX, y, barW, barH, g_themeColor);
+    if (fill > 0) s_tft->fillRect(barX + 1, y + 1, fill, barH - 2, g_themeColor);
 
     char sc[5]; snprintf(sc, sizeof(sc), "%d", score);
     s_tft->setTextColor(g_themeColor, COL_BG);
@@ -549,7 +550,7 @@ static void drawShtfScreen() {
             s_tft->setTextFont(FONT_SMALL);
             s_tft->setTextColor(dotCol, COL_BG);
             s_tft->drawString(d.src, 14, y);
-            int srcEnd = 14 + s_tft->textWidth(d.src) + 4;
+            int srcEnd = 14 + s_tft->textWidth(d.src) + 2;
 
             // Detail right-aligned (severity or date)
             s_tft->setTextColor(g_themeColor, COL_BG);
@@ -558,7 +559,7 @@ static void drawShtfScreen() {
 
             // Event name fills middle, truncated to fit
             String ev = String(d.event);
-            while (ev.length() > 3 && srcEnd + s_tft->textWidth(ev) + 4 > detailX)
+            while (ev.length() > 3 && srcEnd + s_tft->textWidth(ev) > detailX)
                 ev.remove(ev.length() - 1);
             if (ev.length() < strlen(d.event))
                 ev = ev.substring(0, ev.length() - 2) + "..";
@@ -585,7 +586,7 @@ static void drawShtfScreen() {
         s_tft->drawString("[ NO DATA ]", 4, y);
         y += 11;
     } else {
-        for (int i = 0; i < s_bioCount && i < BIO_MAX; i++) {
+        for (int i = 0; i < s_bioCount && i < BIO_VISIBLE; i++) {
             const BioItem &item = s_bio[i];
             uint16_t dotCol = (item.level == 2) ? COL_RED : COL_AMBER;
             s_tft->fillCircle(8, y + 4, 2, dotCol);
@@ -617,12 +618,11 @@ static void drawShtfScreen() {
     drawThreatBar(y, "BIOLOGICAL", s_bioScore);  y += 9;
     drawThreatBar(y, "COMBINED",   s_cmbScore);
 
-    // Bottom bar
-    int ya = SCREEN_H - BOTTOMBAR_H;
-    s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-    s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawCentreString("Q=home  R=refresh  L=location  G=GPS", SCREEN_W / 2, ya + 3, FONT_SMALL);
+    // Themed bottom bar — accent tracks threat level (red/amber/nominal)
+    static const BottomKey SHTF_MENU[] = {
+        {'R', "FRESH"}, {'L', "LOC"}, {'G', "GPS"}, {'Q', "HOME"}
+    };
+    drawMenuBar(*s_tft, SHTF_MENU, 4);
 }
 
 static void showShtfLoading(const char *msg = "Fetching data...") {

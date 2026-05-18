@@ -12,8 +12,8 @@
 #define KB_ADDR          0x55
 #define BOARD_BL_PIN     42
 #define BL_PWM_CHANNEL   0
-#define FW_VERSION       "v1.1.7"
-#define FW_DESC          "SHTF + Waze Cache"
+#define FW_VERSION       "v1.1.8"
+#define FW_DESC          "CODEX + UI Polish"
 
 // ── Data model ────────────────────────────────────────────────────────────────
 struct SysInfo {
@@ -120,13 +120,7 @@ static void pickTheme() {
     drawTopbar(*s_tft, "< SYSTEM | THEME", "", g_themeColor);
     for (int i = 0; i < THEME_COLOR_COUNT; i++) drawRow(i);
     s_tft->setTextFont(FONT_SMALL);
-    {
-        int by = SCREEN_H - BOTTOMBAR_H;
-        s_tft->drawFastHLine(0, by, SCREEN_W, g_themeColor);
-        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
-        s_tft->drawCentreString("W/S=nav  Enter=apply  Q=cancel", SCREEN_W / 2, by + 3, FONT_SMALL);
-    }
+    drawMenuBar(*s_tft, "W/S=NAV  ENTER=APPLY  Q=CANCEL");
 
     while (true) {
         char k = readKeyboard();
@@ -412,16 +406,7 @@ static void drawSysinfoScreen() {
         drawValue(30, y, timeBuf, g_themeColor);
     }
 
-    // Bottom bar
-    {
-        int by = SCREEN_H - BOTTOMBAR_H;
-        s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
-        s_tft->drawFastHLine(0, by, SCREEN_W, g_themeColor);
-        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(g_themeColor, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh  D=name  T=theme  +/-", SCREEN_W / 2, by + 3, FONT_SMALL);
-    }
+    drawMenuBar(*s_tft, "Q=HOME  R=RFSH  D=NAME  T=THEME  +/-=BRT");
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

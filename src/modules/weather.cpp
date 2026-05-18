@@ -376,7 +376,7 @@ static void drawWeatherScreen() {
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, y + 55, FONT_SMALL);
-        s_tft->drawCentreString("Q=home  R=retry  L=set location", SCREEN_W / 2, SCREEN_H - 18, FONT_SMALL);
+        drawMenuBar(*s_tft, "Q=HOME  R=RETRY  L=LOC");
         return;
     }
 
@@ -483,12 +483,7 @@ static void drawWeatherScreen() {
         int aw = s_tft->textWidth(alertText);
         s_tft->drawString(alertText, (SCREEN_W - aw) / 2, ya + 3);
     } else {
-        s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(g_themeColor, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh  L=location", SCREEN_W / 2, ya + 3, FONT_SMALL);
-        drawBatteryIndicatorRight(*s_tft, ya + 1);
+        drawMenuBar(*s_tft, "Q=HOME  R=REFRESH  L=LOC");
     }
 }
 

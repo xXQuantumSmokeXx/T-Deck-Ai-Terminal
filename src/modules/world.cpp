@@ -240,7 +240,7 @@ static void drawQuakesScreen() {
         s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawCentreString(!WiFi.isConnected() ? "OFFLINE" : "No M3.5+ quakes this month",
                                 SCREEN_W / 2, cy + 52, FONT_SMALL);
-        s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+        drawMenuBar(*s_tft, "R=REFRESH  Q=HOME");
         return;
     }
 
@@ -269,13 +269,7 @@ static void drawQuakesScreen() {
         s_tft->drawString(q.when, dateX, y + 2);
     }
 
-    int by = SCREEN_H - BOTTOMBAR_H;
-    s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
-    s_tft->drawFastHLine(0, by, SCREEN_W, g_themeColor);
-    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-    s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);
+    drawMenuBar(*s_tft, "R=REFRESH  Q=HOME");
 }
 
 // ── Fires screen ──────────────────────────────────────────────────────────────
@@ -293,7 +287,7 @@ static void drawFiresScreen() {
         s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawCentreString(!WiFi.isConnected() ? "OFFLINE" : "No wildfires tracked this year",
                                 SCREEN_W / 2, cy + 52, FONT_SMALL);
-        s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+        drawMenuBar(*s_tft, "R=REFRESH  Q=HOME");
         return;
     }
 
@@ -317,13 +311,7 @@ static void drawFiresScreen() {
         s_tft->drawString(fi.when, dateX, y + 2);
     }
 
-    int by = SCREEN_H - BOTTOMBAR_H;
-    s_tft->fillRect(0, by, SCREEN_W, BOTTOMBAR_H, COL_BG);
-    s_tft->drawFastHLine(0, by, SCREEN_W, g_themeColor);
-    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-    s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawCentreString("R=refresh  Q=home", SCREEN_W / 2, by + 3, FONT_SMALL);
+    drawMenuBar(*s_tft, "R=REFRESH  Q=HOME");
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

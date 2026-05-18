@@ -388,11 +388,10 @@ static void drawWazeScreen() {
             s_tft->setTextColor(COL_GREY_MID, COL_BG);
             s_tft->drawCentreString("L=enter coords  R=retry GPS", SCREEN_W / 2, y + 44, FONT_SMALL);
         }
-        int ya = SCREEN_H - BOTTOMBAR_H;
-        s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(g_themeColor, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh  L=location  G=GPS", SCREEN_W / 2, ya + 3, FONT_SMALL);
+        static const BottomKey WAZE_MENU[] = {
+            {'R', "FRESH"}, {'L', "LOC"}, {'G', "GPS"}, {'Q', "HOME"}
+        };
+        drawMenuBar(*s_tft, WAZE_MENU, 4);
         return;
     }
 
@@ -433,12 +432,11 @@ static void drawWazeScreen() {
         s_tft->drawString(sbuf, SCREEN_W - sw - 4, y);
     }
 
-    // Bottom bar
-    int ya = SCREEN_H - BOTTOMBAR_H;
-    s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-    s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawCentreString("Q=home  R=refresh  L=location  G=GPS", SCREEN_W / 2, ya + 3, FONT_SMALL);
+    // Themed bottom bar — all keys in theme color
+    static const BottomKey WAZE_MENU[] = {
+        {'R', "FRESH"}, {'L', "LOC"}, {'G', "GPS"}, {'Q', "HOME"}
+    };
+    drawMenuBar(*s_tft, WAZE_MENU, 4);
 }
 
 static void showLoadingScreen() {

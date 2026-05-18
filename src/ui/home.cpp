@@ -14,7 +14,7 @@ static const TileDef TILES[TILE_COUNT] = {
     { "AI CHAT",  COL_MAGENTA },  // 0
     { "WEATHER",  COL_CYAN    },  // 1
     { "SOLAR",    COL_AMBER   },  // 2
-    { "LOG",      COL_CYAN    },  // 3
+    { "CODEX",    COL_CYAN    },  // 3
     { "CRYPTO",   COL_CYAN    },  // 4
     { "FIRES",    COL_RED     },  // 5
     { "USGS",     COL_GREEN   },  // 6

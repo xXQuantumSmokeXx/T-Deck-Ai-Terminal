@@ -526,7 +526,7 @@ static void drawSolarScreen() {
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, cy + 52, FONT_SMALL);
-        s_tft->drawCentreString("Q=home  R=retry", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+        drawMenuBar(*s_tft, "Q=HOME  R=RETRY");
         return;
     }
 
@@ -686,12 +686,7 @@ static void drawSolarScreen() {
         s_tft->setTextColor(COL_BG, COL_AMBER);
         s_tft->drawCentreString("Bz SOUTHWARD - LoRa IMPACT POSSIBLE", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
     } else {
-        s_tft->drawFastHLine(0, bottomY, SCREEN_W, g_themeColor);
-        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(g_themeColor, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh", SCREEN_W / 2, bottomY + 3, FONT_SMALL);
-        drawBatteryIndicatorRight(*s_tft, bottomY + 1);
+        drawMenuBar(*s_tft, "Q=HOME  R=REFRESH");
     }
 }
 

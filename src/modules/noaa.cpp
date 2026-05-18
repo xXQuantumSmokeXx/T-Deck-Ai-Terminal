@@ -1,4 +1,5 @@
 #include "noaa.h"
+#include "scripture.h"
 #include "../ui/theme.h"
 #include "../ui/widgets.h"
 #include <Wire.h>
@@ -30,6 +31,10 @@ static bool      s_savedOk = false;
 static String    s_input = "";
 static char      s_status[30] = "SD: --";
 static char      s_clockStr[12] = "";
+
+enum NoaaMode { NM_SELECT, NM_NOTES, NM_SCRIPTURE };
+static NoaaMode s_noaaMode = NM_SELECT;
+static int      s_modeIdx  = 0;  // 0 = MY NOTES, 1 = SCRIPTURE
 
 static char readKeyboard() {
     char key = 0;
@@ -225,14 +230,18 @@ static void drawInput() {
 static void drawLogScreen() {
     updateClockStr();
     s_tft->fillScreen(COL_BG);
-    drawTopbar(*s_tft, "< HOME | LOG", s_clockStr, g_themeColor);
+    drawTopbar(*s_tft, "< HOME | CODEX", s_clockStr, g_themeColor);
 
     s_tft->fillRect(0, TOPBAR_H, SCREEN_W, STATUSBAR_H, COL_BG);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(s_sdOk ? g_themeColor : COL_AMBER, COL_BG);
     s_tft->drawString(s_status, 4, TOPBAR_H + 3);
+    // Context-sensitive shortcuts on right side
+    const char *hint = (!s_input.isEmpty() || s_editIndex >= 0)
+        ? "Enter=save  Del=back"
+        : (s_lineCount > 0 ? "E=edit  D=del  Del=back" : "Del=back");
     s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawString("Q=home", SCREEN_W - s_tft->textWidth("Q=home") - 4, TOPBAR_H + 3);
+    s_tft->drawString(hint, SCREEN_W - s_tft->textWidth(hint) - 4, TOPBAR_H + 3);
     s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, g_themeColor);
 
     int y = CONTENT_Y + 2;
@@ -277,19 +286,88 @@ static void drawLogScreen() {
     drawInput();
 }
 
+// Mode selector box layout constants (used in draw + touch)
+#define MODE_BOX_X  20
+#define MODE_BOX_W  (SCREEN_W - 40)
+#define MODE_BOX_H  36
+#define MODE_NOTES_Y (CONTENT_Y + 22)
+#define MODE_LIB_Y   (CONTENT_Y + 74)
+
+static void drawModeSelect() {
+    updateClockStr();
+    s_tft->fillScreen(COL_BG);
+    drawTopbar(*s_tft, "< HOME | CODEX", s_clockStr, g_themeColor);
+
+    s_tft->fillRect(0, TOPBAR_H, SCREEN_W, STATUSBAR_H, COL_BG);
+    s_tft->setTextFont(FONT_SMALL);
+    s_tft->setTextColor(g_themeColor, COL_BG);
+    s_tft->drawString("W/S or trackball   Enter/tap=open   Q=home", 4, TOPBAR_H + 3);
+    s_tft->drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, g_themeColor);
+
+    if (s_modeIdx == 0)
+        drawCornerBrackets(*s_tft, MODE_BOX_X, MODE_NOTES_Y, MODE_BOX_W, MODE_BOX_H, g_themeColor, 6);
+    else
+        drawCornerBrackets(*s_tft, MODE_BOX_X, MODE_LIB_Y,   MODE_BOX_W, MODE_BOX_H, g_themeColor, 6);
+
+    s_tft->setTextColor(g_themeColor, COL_BG);
+    s_tft->drawCentreString("MY LOGS",  SCREEN_W / 2, MODE_NOTES_Y + 10, FONT_MED);
+    s_tft->drawCentreString("LIBRARY",  SCREEN_W / 2, MODE_LIB_Y   + 10, FONT_MED);
+}
+
 void noaaInit(TFT_eSPI &tft) {
-    s_tft = &tft;
-    s_input = "";
-    s_scrollOff = 0;
-    s_selected = 0;
-    s_editIndex = -1;
-    s_savedOk = false;
-    loadVisibleLines();
-    drawLogScreen();
+    s_tft      = &tft;
+    s_noaaMode = NM_SELECT;
+    s_modeIdx  = 0;
+    drawModeSelect();
 }
 
 bool noaaLoop(TFT_eSPI &tft) {
-    (void)tft;
+    // ── Scripture sub-mode ────────────────────────────────────────────────────
+    if (s_noaaMode == NM_SCRIPTURE) {
+        bool cont = scriptureLoop(tft);
+        if (!cont) {
+            if (scriptureWantsHome()) return false;  // Q pressed — exit all the way to home
+            s_noaaMode = NM_SELECT;
+            s_modeIdx  = 1;
+            drawModeSelect();
+        }
+        return true;
+    }
+
+    // ── Mode selector ─────────────────────────────────────────────────────────
+    if (s_noaaMode == NM_SELECT) {
+        char key = readKeyboard();
+        if (key == 0) { delay(20); return true; }
+
+        if (key == 8 || key == 127 || key == 17 || key == 27 || key == 'q' || key == 'Q') return false;
+
+        bool changed = false;
+        if ((key == 'w' || key == 'W' || key == 'i' || key == 'I') && s_modeIdx != 0) {
+            s_modeIdx = 0; changed = true;
+        } else if ((key == 's' || key == 'S' || key == 'k' || key == 'K') && s_modeIdx != 1) {
+            s_modeIdx = 1; changed = true;
+        } else if (key == '\r' || key == '\n') {
+            if (s_modeIdx == 0) {
+                s_noaaMode  = NM_NOTES;
+                s_input     = "";
+                s_scrollOff = 0;
+                s_selected  = 0;
+                s_editIndex = -1;
+                s_savedOk   = false;
+                loadVisibleLines();
+                drawLogScreen();
+            } else {
+                s_noaaMode = NM_SCRIPTURE;
+                scriptureInit(tft);
+            }
+        }
+
+        if (changed) drawModeSelect();
+        delay(20);
+        return true;
+    }
+
+    // ── Notes mode (existing behavior) ────────────────────────────────────────
     char key = readKeyboard();
     if (key == 0) { delay(20); return true; }
 
@@ -333,9 +411,16 @@ bool noaaLoop(TFT_eSPI &tft) {
         }
         drawLogScreen();
     } else if (key == 8 || key == 127) {
-        if (s_input.length() > 0) s_input.remove(s_input.length() - 1);
-        else s_editIndex = -1;
-        drawInput();
+        if (s_input.length() > 0) {
+            s_input.remove(s_input.length() - 1);
+            drawInput();
+        } else if (s_editIndex >= 0) {
+            s_editIndex = -1;
+            drawInput();
+        } else {
+            s_noaaMode = NM_SELECT;
+            drawModeSelect();
+        }
     } else if (isprint((unsigned char)key) && s_input.length() < INPUT_MAX) {
         s_input += key;
         drawInput();
@@ -346,20 +431,77 @@ bool noaaLoop(TFT_eSPI &tft) {
 }
 
 void noaaTrackballUp() {
+    if (s_noaaMode == NM_SCRIPTURE) { scriptureTrackballUp(); return; }
+    if (s_noaaMode == NM_SELECT) {
+        if (s_modeIdx != 0) { s_modeIdx = 0; drawModeSelect(); }
+        return;
+    }
     s_savedOk = false;
-    int maxOff = max(0, s_totalLines - LOG_VISIBLE);
-    if (s_scrollOff < maxOff) {
-        s_scrollOff++;
-        loadVisibleLines();
+    if (!s_input.isEmpty()) return;  // don't navigate while typing
+    if (s_selected > 0) {
+        s_selected--;
         drawLogScreen();
+    } else {
+        int maxOff = max(0, s_totalLines - LOG_VISIBLE);
+        if (s_scrollOff < maxOff) {
+            s_scrollOff++;
+            loadVisibleLines();
+            drawLogScreen();
+        }
     }
 }
 
 void noaaTrackballDown() {
+    if (s_noaaMode == NM_SCRIPTURE) { scriptureTrackballDown(); return; }
+    if (s_noaaMode == NM_SELECT) {
+        if (s_modeIdx != 1) { s_modeIdx = 1; drawModeSelect(); }
+        return;
+    }
     s_savedOk = false;
-    if (s_scrollOff > 0) {
-        s_scrollOff--;
-        loadVisibleLines();
+    if (!s_input.isEmpty()) return;  // don't navigate while typing
+    if (s_selected < s_lineCount - 1) {
+        s_selected++;
         drawLogScreen();
+    } else {
+        if (s_scrollOff > 0) {
+            s_scrollOff--;
+            loadVisibleLines();
+            drawLogScreen();
+        }
+    }
+}
+
+void noaaTouchTap(uint16_t x, uint16_t y) {
+    if (s_noaaMode == NM_SCRIPTURE) {
+        scriptureTouchTap(x, y);
+        return;
+    }
+    if (s_noaaMode == NM_SELECT) {
+        if (x < MODE_BOX_X || x >= MODE_BOX_X + MODE_BOX_W) return;
+        if (y >= MODE_NOTES_Y && y < MODE_NOTES_Y + MODE_BOX_H) {
+            s_modeIdx  = 0;
+            s_noaaMode = NM_NOTES;
+            s_input     = "";
+            s_scrollOff = 0;
+            s_selected  = 0;
+            s_editIndex = -1;
+            s_savedOk   = false;
+            loadVisibleLines();
+            drawLogScreen();
+        } else if (y >= MODE_LIB_Y && y < MODE_LIB_Y + MODE_BOX_H) {
+            s_modeIdx  = 1;
+            s_noaaMode = NM_SCRIPTURE;
+            scriptureInit(*s_tft);
+        }
+        return;
+    }
+    if (s_noaaMode == NM_NOTES) {
+        if (y >= CONTENT_Y && y < (uint16_t)(SCREEN_H - 24) && s_lineCount > 0) {
+            int vis = (y - CONTENT_Y) / LOG_ROW_H;
+            if (vis >= 0 && vis < s_lineCount) {
+                s_selected = vis;
+                drawLogScreen();
+            }
+        }
     }
 }

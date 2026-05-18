@@ -323,6 +323,44 @@ static void handleHomeTouch() {
     s_prevTouched = touched;
 }
 
+// ── Module touch handler (SCR_ALERTS etc.) ────────────────────────────────────
+static void handleModuleTouch() {
+    if (!s_touch || !s_touchReady) return;
+
+    if (s_prevTouched && s_touchDownMs && (millis() - s_touchDownMs > 1000)) {
+        s_prevTouched = false;
+        s_touchDownMs = 0;
+    }
+
+    if (digitalRead(TOUCH_INT_PIN) != LOW) return;
+
+    bool touched = s_touch->read() && s_touch->getPointNum() > 0;
+
+    if (touched) {
+        TP_Point p = s_touch->getPoint(0);
+        if (p.x < SCREEN_W && p.y < SCREEN_H) {
+            s_tapX = p.x;
+            s_tapY = (SCREEN_H - 1) - p.y;
+            s_touchDownMs = millis();
+        } else {
+            touched = false;
+        }
+    }
+
+    if (!touched && s_prevTouched) {
+        s_touchDownMs = 0;
+        uint32_t now = millis();
+        if (now - s_lastTapMs > 300) {
+            s_lastTapMs = now;
+            s_prevTouched = false;
+            if (s_screen == SCR_ALERTS) noaaTouchTap(s_tapX, s_tapY);
+            return;
+        }
+    }
+
+    s_prevTouched = touched;
+}
+
 // ── Return to home ────────────────────────────────────────────────────────────
 static void returnHome() {
     if (s_screen == SCR_CHAT) chatExit();
@@ -501,19 +539,87 @@ static void loadDonkiKeyFromSD() {
     }
     SD.end();
 }
+// Quantum Smoke sigil — pointy-top hexagon + inner diamond + crosshairs + smoke wisps
+static void drawSplashLogo(TFT_eSPI &t, int cx, int cy) {
+    const uint16_t C = g_themeColor;
+
+    // Pointy-top hexagon, r=36 (pre-computed vertices, no float)
+    // Vertices: top, upper-right, lower-right, bottom, lower-left, upper-left
+    static const int8_t HX[] = {  0, 31, 31,  0, -31, -31 };
+    static const int8_t HY[] = { -36, -18, 18, 36,  18, -18 };
+    for (int i = 0; i < 6; i++) {
+        int j = (i + 1) % 6;
+        t.drawLine(cx + HX[i], cy + HY[i], cx + HX[j], cy + HY[j], C);
+        t.drawLine(cx + HX[i] + (HX[i] > 0 ? -1 : HX[i] < 0 ? 1 : 0),
+                   cy + HY[i] + (HY[i] > 0 ? -1 : HY[i] < 0 ? 1 : 0),
+                   cx + HX[j] + (HX[j] > 0 ? -1 : HX[j] < 0 ? 1 : 0),
+                   cy + HY[j] + (HY[j] > 0 ? -1 : HY[j] < 0 ? 1 : 0), C);  // double stroke
+    }
+
+    // Inner diamond (rotated square, r=18)
+    t.drawLine(cx,      cy - 18, cx + 18, cy,      C);
+    t.drawLine(cx + 18, cy,      cx,      cy + 18, C);
+    t.drawLine(cx,      cy + 18, cx - 18, cy,      C);
+    t.drawLine(cx - 18, cy,      cx,      cy - 18, C);
+
+    // Cardinal crosshair ticks (extending outward from hex)
+    t.drawFastVLine(cx, cy - 46, 8, C);   // top
+    t.drawFastVLine(cx, cy + 38, 8, C);   // bottom
+    t.drawFastHLine(cx - 40, cy, 8, C);   // left
+    t.drawFastHLine(cx + 32, cy, 8, C);   // right
+
+    // Centre pip
+    t.fillCircle(cx, cy, 3, C);
+    t.drawCircle(cx, cy, 6, C);
+
+    // Smoke wisps — three tendrils rising from top vertex
+    int wx = cx, wy = cy - 36;
+    // Left wisp
+    t.drawLine(wx - 2, wy,      wx - 6, wy - 9,  C);
+    t.drawLine(wx - 6, wy - 9,  wx - 2, wy - 17, C);
+    t.drawLine(wx - 2, wy - 17, wx - 5, wy - 24, C);
+    // Centre wisp
+    t.drawLine(wx,     wy - 2,  wx + 1, wy - 11, C);
+    t.drawLine(wx + 1, wy - 11, wx - 2, wy - 20, C);
+    t.drawLine(wx - 2, wy - 20, wx + 1, wy - 27, C);
+    // Right wisp
+    t.drawLine(wx + 2, wy,      wx + 6, wy - 9,  C);
+    t.drawLine(wx + 6, wy - 9,  wx + 2, wy - 17, C);
+    t.drawLine(wx + 2, wy - 17, wx + 5, wy - 24, C);
+
+    // xX marks flanking the hex (brand: xXMayDayXx)
+    for (int side = -1; side <= 1; side += 2) {
+        int xx = cx + side * 48;
+        t.drawLine(xx - 4, cy - 4, xx + 4, cy + 4, C);
+        t.drawLine(xx + 4, cy - 4, xx - 4, cy + 4, C);
+    }
+}
+
 static void showSplash() {
     tft.fillScreen(COL_BG);
+
+    // Corner border
+    drawCornerBrackets(tft, 2, 2, SCREEN_W - 4, SCREEN_H - 4, g_themeColor, 16);
+
+    // Logo — centered horizontally, upper half of screen
+    drawSplashLogo(tft, SCREEN_W / 2, 84);
+
+    // Brand name
     tft.setTextFont(FONT_LARGE);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("T-Deck-Ai-Terminal", SCREEN_W / 2, 72, FONT_LARGE);
+    tft.drawCentreString("MAYDAY", SCREEN_W / 2, 136, FONT_LARGE);
+
+    // Device name
     tft.setTextFont(FONT_MED);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("xXMayDayXx", SCREEN_W / 2, 110, FONT_MED);
+    tft.drawCentreString("Ai Field Terminal", SCREEN_W / 2, 168, FONT_MED);
+
+    // Studio tag
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("xXQuantum-SmokeXx", SCREEN_W / 2, 134, FONT_SMALL);
-    drawCornerBrackets(tft, 2, 2, SCREEN_W - 4, SCREEN_H - 4, g_themeColor, 12);
-    delay(1800);
+    tft.drawCentreString("xXQuantum-SmokeXx", SCREEN_W / 2, 192, FONT_SMALL);
+
+    delay(2200);
     tft.fillScreen(COL_BG);
 }
 
@@ -648,6 +754,7 @@ void loop() {
 
     } else if (s_screen == SCR_ALERTS) {
         handleScreenTrackball();
+        handleModuleTouch();
         if (!noaaLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_WORLD) {

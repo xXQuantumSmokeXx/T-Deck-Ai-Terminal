@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include <time.h>
 #include "theme.h"
 #include "../config/nvs_config.h"
 
@@ -59,6 +60,22 @@ inline void drawStatusBar(TFT_eSPI &tft, bool wifiOk, bool loraOk, const char *c
     }
 
     (void)kp;  // Kp removed from home status bar
+
+    // Date (right-aligned)
+    {
+        static const char *DAYS[]   = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+        static const char *MONTHS[] = {"Jan","Feb","Mar","Apr","May","Jun",
+                                       "Jul","Aug","Sep","Oct","Nov","Dec"};
+        struct tm ti;
+        if (getLocalTime(&ti, 0)) {
+            char dateBuf[20];
+            snprintf(dateBuf, sizeof(dateBuf), "%s %s %d %04d",
+                     DAYS[ti.tm_wday], MONTHS[ti.tm_mon], ti.tm_mday, ti.tm_year + 1900);
+            tft.setTextColor(g_themeColor, COL_BG);
+            int dw = tft.textWidth(dateBuf);
+            tft.drawString(dateBuf, SCREEN_W - dw - 4, TOPBAR_H + 2);
+        }
+    }
 
     tft.drawFastHLine(0, TOPBAR_H + STATUSBAR_H - 1, SCREEN_W, g_themeColor);
 }
@@ -177,4 +194,37 @@ inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
 // ── Status dot ────────────────────────────────────────────────────────────────
 inline void drawStatusDot(TFT_eSPI &tft, int x, int y, uint16_t col) {
     tft.fillCircle(x, y, 3, col);
+}
+
+// ── Themed menu bar ───────────────────────────────────────────────────────────
+// Two border lines, all-caps items spaced across the bar, no dividers.
+struct BottomKey { char key; const char *label; };
+
+inline void drawMenuBar(TFT_eSPI &tft, const BottomKey *keys, int count) {
+    int y = SCREEN_H - BOTTOMBAR_H;
+    tft.fillRect(0, y, SCREEN_W, BOTTOMBAR_H, COL_BG);
+    tft.drawFastHLine(0, y,            SCREEN_W, g_themeColor);
+    tft.drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(g_themeColor, COL_BG);
+    String line;
+    for (int i = 0; i < count; i++) {
+        if (i > 0) line += "  ";
+        char ks[2] = { keys[i].key, 0 };
+        line += ks;
+        line += '=';
+        line += keys[i].label;
+    }
+    tft.drawCentreString(line, SCREEN_W / 2, y + 3, FONT_SMALL);
+}
+
+// Free-form overload for compound shortcuts (caller supplies all-caps text).
+inline void drawMenuBar(TFT_eSPI &tft, const char *text) {
+    int y = SCREEN_H - BOTTOMBAR_H;
+    tft.fillRect(0, y, SCREEN_W, BOTTOMBAR_H, COL_BG);
+    tft.drawFastHLine(0, y,            SCREEN_W, g_themeColor);
+    tft.drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
+    tft.setTextFont(FONT_SMALL);
+    tft.setTextColor(g_themeColor, COL_BG);
+    tft.drawCentreString(text, SCREEN_W / 2, y + 3, FONT_SMALL);
 }

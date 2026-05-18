@@ -407,7 +407,7 @@ static void drawBtcScreen() {
         s_tft->setTextFont(FONT_SMALL);
         s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawCentreString("OFFLINE - no cache available", SCREEN_W / 2, contentY + 62, FONT_SMALL);
-        s_tft->drawCentreString("Q=home  R=retry  C=coins", SCREEN_W / 2, SCREEN_H - 12, FONT_SMALL);
+        drawMenuBar(*s_tft, "Q=HOME  R=RETRY  C=COINS");
         return;
     }
 
@@ -463,12 +463,7 @@ static void drawBtcScreen() {
             s_tft->drawString("7D", 252, ry + 16);
         }
 
-        int ya = SCREEN_H - BOTTOMBAR_H;
-        s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-        s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-        s_tft->setTextFont(FONT_SMALL);
-        s_tft->setTextColor(g_themeColor, COL_BG);
-        s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, ya + 3, FONT_SMALL);
+        drawMenuBar(*s_tft, "Q=HOME  R=REFRESH  C=COINS");
         return;
     }
     for (int i = 0; i < s_coinCount; i++) {
@@ -546,13 +541,7 @@ static void drawBtcScreen() {
         s_tft->drawString("7D", sx, ry + rowH - 12);
     }
 
-    // ── Hint bar ─────────────────────────────────────────────────────────────
-    int ya = SCREEN_H - BOTTOMBAR_H;
-    s_tft->drawFastHLine(0, ya, SCREEN_W, g_themeColor);
-    s_tft->drawFastHLine(0, SCREEN_H - 1, SCREEN_W, g_themeColor);
-    s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(g_themeColor, COL_BG);
-    s_tft->drawCentreString("Q=home  R=refresh  C=coins", SCREEN_W / 2, ya + 3, FONT_SMALL);
+    drawMenuBar(*s_tft, "Q=HOME  R=REFRESH  C=COINS");
 }
 
 // ── Coin picker ───────────────────────────────────────────────────────────────
