@@ -11,14 +11,18 @@ struct TileDef {
 };
 
 static const TileDef TILES[TILE_COUNT] = {
-    { "AI CHAT",  COL_MAGENTA },
-    { "WEATHER",  COL_CYAN    },
-    { "SOLAR",    COL_AMBER   },
-    { "LOG",      COL_CYAN    },
-    { "CRYPTO",   COL_CYAN    },
-    { "FIRES",    COL_RED     },
-    { "USGS",     COL_GREEN   },
-    { "SYSTEM",   COL_CYAN    },
+    { "AI CHAT",  COL_MAGENTA },  // 0
+    { "WEATHER",  COL_CYAN    },  // 1
+    { "SOLAR",    COL_AMBER   },  // 2
+    { "LOG",      COL_CYAN    },  // 3
+    { "CRYPTO",   COL_CYAN    },  // 4
+    { "FIRES",    COL_RED     },  // 5
+    { "USGS",     COL_GREEN   },  // 6
+    { "SHTF",     COL_RED     },  // 7  SHTF monitor
+    { "HAZARD",   COL_GOLD    },  // 8  Waze accidents + hazards
+    { "POLICE",   COL_AMBER   },  // 9  Waze police alerts
+    { "ROAD",     COL_RED     },  // 10 Waze road closures + jams
+    { "SYSTEM",   COL_CYAN    },  // 11 System info
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -140,15 +144,56 @@ static void drawTileIcon(TFT_eSPI &t, int idx, int cx, int cy) {
         break;
     }
 
-    case 7: { // SYSTEM — gear
+    case 7: { // SHTF — shield outline with lightning bolt
+        // Shield
+        t.drawLine(cx-10, cy-12, cx+10, cy-12, C);
+        t.drawLine(cx-10, cy-12, cx-10, cy+0,  C);
+        t.drawLine(cx+10, cy-12, cx+10, cy+0,  C);
+        t.drawLine(cx-10, cy+0,  cx,    cy+12, C);
+        t.drawLine(cx+10, cy+0,  cx,    cy+12, C);
+        // Lightning bolt (double-stroke)
+        t.drawLine(cx+4,  cy-9,  cx-1,  cy-1,  C);
+        t.drawLine(cx+5,  cy-9,  cx,    cy-1,  C);
+        t.drawLine(cx-1,  cy-1,  cx+2,  cy-1,  C);
+        t.drawLine(cx+2,  cy-1,  cx-3,  cy+9,  C);
+        t.drawLine(cx+3,  cy-1,  cx-2,  cy+9,  C);
+        break;
+    }
+
+    case 8: { // HAZARD — warning triangle with exclamation
+        t.drawLine(cx,    cy-12, cx-10, cy+8, C);
+        t.drawLine(cx-10, cy+8,  cx+10, cy+8, C);
+        t.drawLine(cx+10, cy+8,  cx,    cy-12, C);
+        t.drawLine(cx,    cy-10, cx-8,  cy+6, C);
+        t.drawLine(cx-8,  cy+6,  cx+8,  cy+6, C);
+        t.drawLine(cx+8,  cy+6,  cx,    cy-10, C);
+        t.fillRect(cx-1, cy-6, 3, 7, C);   // shaft
+        t.fillRect(cx-1, cy+3, 3, 3, C);   // dot
+        break;
+    }
+
+    case 9: { // POLICE — 6-point star (classic badge shape)
+        t.fillTriangle(cx, cy-12, cx-10, cy+4,  cx+10, cy+4,  C);  // top half
+        t.fillTriangle(cx, cy+12, cx-10, cy-4,  cx+10, cy-4,  C);  // bottom half
+        t.fillCircle(cx, cy, 4, B);  // centre hole
+        break;
+    }
+
+    case 10: { // ROAD — road barrier (two posts + crossbars)
+        t.fillRect(cx-12, cy-10, 3, 20, C);  // left post
+        t.fillRect(cx+9,  cy-10, 3, 20, C);  // right post
+        t.fillRect(cx-9,  cy-7,  18, 3, C);  // top bar
+        t.fillRect(cx-9,  cy+4,  18, 3, C);  // bottom bar
+        break;
+    }
+
+    case 11: { // SYSTEM — gear
         t.drawCircle(cx, cy, 10, C);
         t.drawCircle(cx, cy,  5, C);
-        // N/S/E/W teeth
         t.fillRect(cx-2, cy-14, 4, 5, C);
         t.fillRect(cx-2, cy+10, 4, 5, C);
         t.fillRect(cx-14, cy-2, 5, 4, C);
         t.fillRect(cx+10, cy-2, 5, 4, C);
-        // Diagonal teeth
         t.fillRect(cx+6,  cy-11, 4, 4, C);
         t.fillRect(cx-10, cy-11, 4, 4, C);
         t.fillRect(cx+6,  cy+8,  4, 4, C);

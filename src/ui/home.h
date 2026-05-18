@@ -10,8 +10,12 @@ enum TileID {
     TILE_BTC     = 4,
     TILE_FIRE    = 5,
     TILE_WORLD   = 6,
-    TILE_SYSINFO = 7,
-    TILE_COUNT   = 8
+    TILE_SHTF    = 7,   // SHTF monitor: grid + outbreak + threat index
+    TILE_HAZARD  = 8,   // Waze: accidents + hazards
+    TILE_POLICE  = 9,   // Waze: police alerts
+    TILE_ROAD    = 10,  // Waze: road closures + jams
+    TILE_SYSINFO = 11,  // System info
+    TILE_COUNT   = 12
 };
 
 void homeInit(TFT_eSPI &tft);

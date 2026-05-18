@@ -19,6 +19,8 @@
 #include "modules/sysinfo.h"
 #include "modules/noaa.h"
 #include "modules/world.h"
+#include "modules/waze.h"
+#include "modules/shtf.h"
 
 // ── Touch ─────────────────────────────────────────────────────────────────────
 #define TOUCH_INT_PIN   16
@@ -64,7 +66,7 @@ static void initBrightness() {
 }
 
 // ── Screen state ──────────────────────────────────────────────────────────────
-enum Screen { SCR_HOME, SCR_CHAT, SCR_WEATHER, SCR_SOLAR, SCR_BTC, SCR_SYSINFO, SCR_ALERTS, SCR_WORLD, SCR_STUB };
+enum Screen { SCR_HOME, SCR_CHAT, SCR_WEATHER, SCR_SOLAR, SCR_BTC, SCR_SYSINFO, SCR_ALERTS, SCR_WORLD, SCR_HAZARD, SCR_POLICE, SCR_ROAD, SCR_SHTF, SCR_STUB };
 
 static Screen    s_screen = SCR_HOME;
 static TFT_eSPI  tft;
@@ -177,6 +179,12 @@ static void handleScreenTrackball() {
     } else if (s_screen == SCR_WORLD) {
         if (up)   worldTrackballUp();
         if (down) worldTrackballDown();
+    } else if (s_screen == SCR_HAZARD || s_screen == SCR_POLICE || s_screen == SCR_ROAD) {
+        if (up)   wazeTrackballUp();
+        if (down) wazeTrackballDown();
+    } else if (s_screen == SCR_SHTF) {
+        if (up)   shtfTrackballUp();
+        if (down) shtfTrackballDown();
     }
 }
 
@@ -379,7 +387,35 @@ static void launchTile(TileID id) {
             s_screen = SCR_WORLD;
             worldInitFires(tft);
             int _u, _d, _l, _r;
-            drainTrackball(_u, _d, _l, _r);  // discard pulses stacked during fetch
+            drainTrackball(_u, _d, _l, _r);
+            break;
+        }
+        case TILE_HAZARD: {
+            s_screen = SCR_HAZARD;
+            wazeHazardInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);
+            break;
+        }
+        case TILE_POLICE: {
+            s_screen = SCR_POLICE;
+            wazePoliceInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);
+            break;
+        }
+        case TILE_ROAD: {
+            s_screen = SCR_ROAD;
+            wazeRoadInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);
+            break;
+        }
+        case TILE_SHTF: {
+            s_screen = SCR_SHTF;
+            shtfInit(tft);
+            int _u, _d, _l, _r;
+            drainTrackball(_u, _d, _l, _r);
             break;
         }
         default:
@@ -417,6 +453,37 @@ static void loadPortalUrlFromSD() {
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 // SD donki.txt boot load
+static void loadSdKey(const char *filename, const char *nvsKey) {
+    if (!SD.begin(BOARD_SDCARD_CS)) return;
+    if (!SD.exists(filename)) { SD.end(); return; }
+    File f = SD.open(filename, FILE_READ);
+    if (!f) { SD.end(); return; }
+    String key = f.readStringUntil('\n');
+    key.trim();
+    if (key.length() >= 3 &&
+        (uint8_t)key[0] == 0xEF &&
+        (uint8_t)key[1] == 0xBB &&
+        (uint8_t)key[2] == 0xBF) key = key.substring(3);
+    f.close();
+    SD.end();
+    if (key.length() > 0) nvsPutString(nvsKey, key);
+}
+
+static void loadWazeKeyFromSD() {
+    if (!SD.begin(BOARD_SDCARD_CS)) return;
+    if (!SD.exists("/waze.txt")) { SD.end(); return; }
+    File f = SD.open("/waze.txt", FILE_READ);
+    if (!f) { SD.end(); return; }
+    String key = f.readStringUntil('\n');
+    key.trim();
+    if (key.length() >= 3 &&
+        (uint8_t)key[0] == 0xEF &&
+        (uint8_t)key[1] == 0xBB &&
+        (uint8_t)key[2] == 0xBF) key = key.substring(3);
+    f.close();
+    if (key.length() > 0) nvsPutString("waze_key", key);
+    SD.end();
+}
 static void loadDonkiKeyFromSD() {
     if (!SD.begin(BOARD_SDCARD_CS)) return;
     if (!SD.exists("/donki.txt")) { SD.end(); return; }
@@ -457,7 +524,7 @@ static void bootWifi() {
 
     tft.fillScreen(COL_BG);
     tft.setTextFont(FONT_SMALL);
-    tft.setTextColor(COL_GREY_MID, COL_BG);
+    tft.setTextColor(g_themeColor, COL_BG);
     tft.drawString("Connecting to WiFi...", 4, 10);
 
     if (wifiConnect()) {
@@ -468,7 +535,7 @@ static void bootWifi() {
         configTime(0, 0, "pool.ntp.org", "time.nist.gov");
         setenv("TZ", "EST5EDT,M3.2.0,M11.1.0", 1);
         tzset();
-        tft.setTextColor(COL_GREY_MID, COL_BG);
+        tft.setTextColor(g_themeColor, COL_BG);
         tft.drawString("Syncing time...", 4, 42);
         uint32_t t0 = millis();
         while (time(nullptr) < 1000000 && millis() - t0 < 4000) delay(100);
@@ -523,6 +590,10 @@ void setup() {
     showSplash();
     loadPortalUrlFromSD();
     loadDonkiKeyFromSD();
+    loadWazeKeyFromSD();
+    loadSdKey("/healthmap.txt",   "hmap_key");
+    loadSdKey("/eia.txt",         "eia_key");
+    loadSdKey("/poweroutage.txt", "poutage_key");
     bootWifi();
     personaMgrInit();
 
@@ -582,6 +653,22 @@ void loop() {
     } else if (s_screen == SCR_WORLD) {
         handleScreenTrackball();
         if (!worldLoop(tft)) returnHome();
+
+    } else if (s_screen == SCR_HAZARD) {
+        handleScreenTrackball();
+        if (!wazeHazardLoop(tft)) returnHome();
+
+    } else if (s_screen == SCR_POLICE) {
+        handleScreenTrackball();
+        if (!wazePoliceLoop(tft)) returnHome();
+
+    } else if (s_screen == SCR_ROAD) {
+        handleScreenTrackball();
+        if (!wazeRoadLoop(tft)) returnHome();
+
+    } else if (s_screen == SCR_SHTF) {
+        handleScreenTrackball();
+        if (!shtfLoop(tft)) returnHome();
 
     } else {
         handleScreenTrackball();

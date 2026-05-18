@@ -12,8 +12,8 @@
 #define KB_ADDR          0x55
 #define BOARD_BL_PIN     42
 #define BL_PWM_CHANNEL   0
-#define FW_VERSION       "v1.1.6"
-#define FW_DESC          "Touch Support"
+#define FW_VERSION       "v1.1.7"
+#define FW_DESC          "SHTF + Waze Cache"
 
 // ── Data model ────────────────────────────────────────────────────────────────
 struct SysInfo {

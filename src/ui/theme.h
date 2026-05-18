@@ -40,7 +40,7 @@
 
 // ── Tile grid ─────────────────────────────────────────────────────────────────
 #define TILE_COLS    4
-#define TILE_ROWS    2
+#define TILE_ROWS    3
 #define TILE_W       ((SCREEN_W) / TILE_COLS)         // 80px
 #define TILE_H       (CONTENT_H / TILE_ROWS)           // ~96px
 #define TILE_PAD     4

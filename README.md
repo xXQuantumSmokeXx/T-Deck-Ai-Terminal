@@ -1,6 +1,6 @@
 # MayDay T-Deck AI Terminal
 
-A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, and system diagnostics.
+A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, wildfire and USGS earthquake feeds, SHTF situational awareness, local hazard and traffic monitoring via Waze, and system diagnostics.
 
 Built by Commander Smoke, with development assistance from Codex.
 
@@ -31,7 +31,12 @@ Built by Commander Smoke, with development assistance from Codex.
 - **CRYPTO** — Up to six CoinGecko favorites, 24h/7d movement, 7-day sparklines, and Fear & Greed index
 - **FIRES** — NASA EONET open wildfire events, live feed
 - **USGS** — Recent M3.5+ earthquake feed from USGS FDSNWS
+- **SHTF** — Situational awareness monitor: NWS real-time active alerts, FEMA declared disasters (with USGS significant earthquake fallback), CDC/ProMED outbreak feed, and a combined threat index. GPS-located. NVS-cached.
+- **HAZARD** — Nearby Waze accidents and road hazards within 2 km of your GPS location
+- **POLICE** — Nearby Waze police alerts within 2 km
+- **ROAD** — Nearby Waze road closures and traffic jams within 2 km
 - **SYSTEM** — Device, WiFi, SD, heap, uptime, backend, persona status, and brightness control
+- All data screens NVS-cache their last successful fetch for instant load and offline resilience
 - Cyan terminal aesthetic tuned for the T-Deck 320×240 display
 
 ## Hardware Required
@@ -105,6 +110,16 @@ Sets the AI backend base URL. Chat requests go to `{portal_url}/simple`. Delete 
 ```
 
 You can also change the backend URL from within AI CHAT by typing `seturl`.
+
+### `waze.txt` — Optional
+
+HAZARD, POLICE, and ROAD screens use the [OpenWebNinja Waze API](https://openwebninja.com). Get a key and place it on the first line:
+
+```txt
+YOUR_WAZE_API_KEY
+```
+
+Saved to NVS on boot as `waze_key`. Delete after confirmed working.
 
 ### `donki.txt` — Optional
 
@@ -193,6 +208,20 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 - **R**: refresh — **C**: open on-device coin ID editor (up to six slots) — **Q**: home
 
+### SHTF
+
+- **R**: force refresh all feeds — **L**: enter lat/lon manually — **G**: acquire hardware GPS — **Q**: home
+- Trackball up/down scrolls the outbreak list
+- GPS coordinates shared with Waze screens (stored as `waze_lat` / `waze_lon` in NVS)
+- FIPS county and state cached in NVS (`shtf_fips`, `shtf_county`, `shtf_state`). Cleared automatically when you change location.
+
+### HAZARD / POLICE / ROAD
+
+- **R**: force refresh — **L**: enter lat/lon — **G**: acquire hardware GPS — **Q**: home
+- Trackball up/down scrolls the alert list
+- Each mode caches independently. Switching modes draws from each mode's own cache.
+- Requires a Waze API key in `waze.txt` on the SD card (see SD Card Setup above)
+
 ### SYSTEM
 
 - **R**: refresh diagnostics — **+** / **-**: adjust brightness (saved to NVS) — **T**: open theme color picker — **Q**: home
@@ -206,10 +235,12 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 | CRYPTO | CoinGecko markets + Alternative.me Fear & Greed |
 | FIRES | NASA EONET open wildfire events |
 | USGS | USGS FDSNWS earthquake feed |
+| SHTF | NWS active alerts + FEMA declared disasters + USGS significant earthquakes (fallback) + CDC/ProMED RSS |
+| HAZARD / POLICE / ROAD | OpenWebNinja Waze API (requires `waze.txt` key on SD) |
 | LOG | Local SD card `/logs/field.log` |
 | SYSTEM | Local ESP32-S3 state |
 
-Data screens cache their last successful fetch so they remain useful between refreshes and across brief offline periods.
+All data screens NVS-cache their last successful fetch so they display instantly on re-open and stay useful during brief offline periods. Press **R** on any data screen to force a fresh fetch.
 
 ## Project Layout
 
@@ -222,11 +253,23 @@ src/modules/solar.*       Solar / space-weather dashboard
 src/modules/btc.*         Crypto dashboard and CoinGecko favorites
 src/modules/noaa.*        Field LOG module
 src/modules/world.*       FIRES and USGS earthquake feeds
+src/modules/shtf.*        SHTF monitor: NWS + FEMA + bio feeds + threat index
+src/modules/waze.*        Waze hazard / police / road screens (three modes, shared module)
 src/modules/sysinfo.*     System diagnostics and brightness control
 src/net/wifi_mgr.*        WiFi credential handling and NVS storage
 src/persona/              SD persona loader and slot manager
 sd_card/                  Example SD card layout and setup files
 ```
+
+## v1.1.7 Changes
+
+- Added **SHTF** monitor: NWS real-time active alerts (Extreme/Severe/Moderate), FEMA declared disasters (national, most recent), USGS significant earthquake feed as automatic FEMA fallback, CDC and ProMED RSS outbreak feeds, and a combined threat index with DISASTERS / BIOLOGICAL / COMBINED bars
+- Added **HAZARD**, **POLICE**, and **ROAD** screens powered by the OpenWebNinja Waze API — nearby alerts within 2 km, scrollable list, GPS-located
+- NVS response cache added to SHTF (30-min TTL) and all three Waze screens (15-min TTL, per-mode) — screens load instantly from cache on re-open, `~CACHE` indicator shown when displaying stored data
+- SHTF status label now displayed as `xX-CRITICAL-Xx` / `xX-ELEVATED-Xx` / `xX-NOMINAL-Xx`
+- SHTF threat index bars now render in the active theme color
+- Boot screen "Connecting to WiFi" and "Syncing time" text now renders in theme color
+- Waze API key loaded from `waze.txt` on SD card (see SD Card Setup)
 
 ## v1.1.1 Changes
 
@@ -242,6 +285,7 @@ All SD setup files persist until you delete them. Remove them manually after con
 
 - **`wifi.txt`** — contains WiFi credentials
 - **`portal.txt`** — contains your backend URL
+- **`waze.txt`** — contains your Waze API key
 - **`donki.txt`** — contains your NASA API key
 - **Persona files** — may contain private system prompts
 
