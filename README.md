@@ -160,7 +160,23 @@ The CODEX MY LOGS screen writes field notes to `/logs/field.log`. The firmware c
 
 ### LIBRARY (CODEX)
 
-Place plain text books in the SD card root. The firmware auto-indexes them on first open and caches the chapter index in a binary `.idx` file. The KJV Bible (`kjv.txt`) is the primary supported title — Gutenberg-format plain text works out of the box with paragraph reflow to fix the 70-character line wrapping. Any plain-text book with consistent blank-line-separated chapter headings will index correctly.
+Place plain text books in the SD card root. The firmware auto-indexes them on first open and caches the chapter index in a binary `.idx` file.
+
+**[Project Gutenberg](https://www.gutenberg.org)** is the best source for free plain-text books — tens of thousands of public domain titles including the Bible, classic literature, field manuals, and reference works. Download the **Plain Text UTF-8** version of any title and copy it to your SD card root.
+
+```txt
+/kjv.txt          ← KJV Bible (primary tested title)
+/warpeace.txt     ← War and Peace, or any Gutenberg plain text
+/meditations.txt  ← Marcus Aurelius, etc.
+```
+
+The firmware indexes any file matching `/*.txt` in the SD root. Gutenberg format works out of the box — paragraph reflow corrects the 70-character line wrapping so verses and paragraphs read as continuous text. Chapter headings are detected automatically using a blank-line sandwich heuristic (blank line before and after the heading). Any plain-text book with that structure will index cleanly.
+
+**Tips for best results:**
+- Use the **Plain Text UTF-8** download option on Gutenberg — avoid HTML or EPUB
+- The KJV Bible (`kjv.txt`) is the primary tested title and is confirmed working
+- Very large files (500KB+) take a few seconds to index on first open; subsequent opens are instant from the cached `.idx` file
+- If a book indexes poorly, check that its chapter headings are each on their own line with a blank line above and below
 
 ### Crypto Favorites
 
