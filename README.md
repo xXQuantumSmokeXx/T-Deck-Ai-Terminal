@@ -16,7 +16,7 @@ Built by Commander Smoke, with development assistance from Codex.
 
 | CODEX | Crypto | Fires |
 | --- | --- | --- |
-| ![CODEX screen](images/T-Deck-Display/Log.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
+| ![CODEX screen](images/T-Deck-Display/Codex.png) | ![Crypto screen](images/T-Deck-Display/Crypto.png) | ![Fires screen](images/T-Deck-Display/Fires.png) |
 
 | USGS | System | Home (Theme) |
 | --- | --- | --- |
