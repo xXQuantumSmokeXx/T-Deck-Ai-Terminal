@@ -1,6 +1,6 @@
 # MayDay T-Deck AI Terminal
 
-A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, scripture and reference reading, wildfire and USGS earthquake feeds, SHTF situational awareness, local hazard and traffic monitoring via Waze, and system diagnostics.
+A field-ready firmware build for the LILYGO T-Deck ESP32-S3. Started as an AI chat terminal and evolved into a full suite covering AI persona chat, weather, solar conditions, crypto, field logging, scripture and reference reading, wildfire and USGS earthquake feeds, SHTF situational awareness, traffic and hazard monitoring, tarot divination, live news feeds, and system diagnostics.
 
 Built by Commander Smoke, with development assistance from Codex.
 
@@ -32,9 +32,9 @@ Built by Commander Smoke, with development assistance from Codex.
 - **FIRES** — NASA EONET open wildfire events, live feed
 - **USGS** — Recent M3.5+ earthquake feed from USGS FDSNWS
 - **SHTF** — Situational awareness monitor: NWS real-time active alerts, FEMA declared disasters (with USGS significant earthquake fallback), CDC/ProMED outbreak feed, and a combined threat index. GPS-located. NVS-cached.
-- **HAZARD** — Nearby Waze accidents and road hazards within 2 km of your GPS location
-- **POLICE** — Nearby Waze police alerts within 2 km
-- **ROAD** — Nearby Waze road closures and traffic jams within 2 km
+- **TRAFFIC** — Nearby Waze hazards and road incidents within 2 km of your GPS location
+- **ORACLE** — Offline tarot reader: single card, three-card (Past/Present/Future), and five-card Celtic Cross spreads. Full 78-card deck with authentic upright and reversed meanings. Trackball and touch navigation, optional SD save.
+- **NEWS** — Live RSS headlines from CDC, WHO, ABC News, and BBC World. NVS-cached, 30-minute TTL.
 - **SYSTEM** — Device, WiFi, SD, heap, uptime, backend, persona status, and brightness control
 - All data screens NVS-cache their last successful fetch for instant load and offline resilience
 - Consistent themed bottom bar across all screens — two border lines, all-caps shortcuts, no dividers
@@ -113,15 +113,15 @@ Sets the AI backend base URL. Chat requests go to `{portal_url}/simple`. Delete 
 
 You can also change the backend URL from within AI CHAT by typing `seturl`.
 
-### `waze.txt` — Optional
+### `tomtom.txt` — Optional
 
-HAZARD, POLICE, and ROAD screens use the [OpenWebNinja Waze API](https://openwebninja.com). Get a key and place it on the first line:
+The TRAFFIC screen uses the [TomTom Traffic Incidents API](https://developer.tomtom.com). Get a free API key and place it on the first line:
 
 ```txt
-YOUR_WAZE_API_KEY
+YOUR_TOMTOM_API_KEY
 ```
 
-Saved to NVS on boot as `waze_key`. Delete after confirmed working.
+Saved to NVS on boot as `tomtom_key`. Delete after confirmed working.
 
 ### `donki.txt` — Optional
 
@@ -206,7 +206,7 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 ### Module Screens
 
-- **Trackball roll right** or **Q / Escape / Backspace**: return home
+- **Trackball roll right** or **Q / Escape / Backspace / Delete**: return home
 - **R**: refresh on data screens that support it
 
 ### AI CHAT
@@ -248,19 +248,36 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 - **R**: refresh — **C**: open on-device coin ID editor (up to six slots) — **Q**: home
 
+### ORACLE
+
+| Input | Action |
+| --- | --- |
+| Trackball up/down or W/S | Navigate menu / scroll interpretation |
+| Trackball left/right | Navigate spread cards (Past → Present → Future) |
+| Enter | Draw cards / confirm selection |
+| Touch tab bar | Jump directly to that spread position |
+| Touch left/right edge | Previous / next card |
+| R | Save reading to SD (`/oracle/readings/`) |
+| Q / Backspace / Delete | Back / exit |
+
 ### SHTF
 
 - **R**: force refresh all feeds — **L**: enter lat/lon manually — **G**: acquire hardware GPS — **Q**: home
 - Trackball up/down scrolls the outbreak list
-- GPS coordinates shared with Waze screens (stored as `waze_lat` / `waze_lon` in NVS)
+- GPS coordinates shared with TRAFFIC screen (stored as `waze_lat` / `waze_lon` in NVS)
 - FIPS county and state cached in NVS (`shtf_fips`, `shtf_county`, `shtf_state`). Cleared automatically when you change location.
 
-### HAZARD / POLICE / ROAD
+### TRAFFIC
 
 - **R**: force refresh — **L**: enter lat/lon — **G**: acquire hardware GPS — **Q**: home
 - Trackball up/down scrolls the alert list
-- Each mode caches independently. Switching modes draws from each mode's own cache.
-- Requires a Waze API key in `waze.txt` on the SD card (see SD Card Setup above)
+- Requires a TomTom API key in `tomtom.txt` on the SD card (see SD Card Setup above)
+
+### NEWS
+
+- **R**: force refresh — **Q**: home
+- Trackball up/down scrolls headlines
+- Cached for 30 minutes in NVS; stale indicator shown when displaying cached data
 
 ### SYSTEM
 
@@ -276,7 +293,9 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 | FIRES | NASA EONET open wildfire events |
 | USGS | USGS FDSNWS earthquake feed |
 | SHTF | NWS active alerts + FEMA declared disasters + USGS significant earthquakes (fallback) + CDC/ProMED RSS |
-| HAZARD / POLICE / ROAD | OpenWebNinja Waze API (requires `waze.txt` key on SD) |
+| TRAFFIC | TomTom Traffic Incidents API (requires `tomtom.txt` key on SD) |
+| NEWS | CDC, WHO, ABC News, BBC World RSS feeds |
+| ORACLE | Fully offline — no network required |
 | CODEX MY LOGS | Local SD card `/logs/field.log` |
 | CODEX LIBRARY | Local SD card plain text books |
 | SYSTEM | Local ESP32-S3 state |
@@ -296,12 +315,24 @@ src/modules/noaa.*        CODEX hub — MY LOGS field notes and LIBRARY book rea
 src/modules/scripture.*   LIBRARY — SD book indexer, chapter browser, paragraph-reflowed reader
 src/modules/world.*       FIRES and USGS earthquake feeds
 src/modules/shtf.*        SHTF monitor: NWS + FEMA + bio feeds + threat index
-src/modules/waze.*        Waze hazard / police / road screens (three modes, shared module)
+src/modules/waze.*        TRAFFIC — Waze hazard and road incident screen
+src/modules/sigil.*       ORACLE — offline tarot reader, 78-card deck, spread layouts, touch nav
+src/modules/sigil_cards.h Full 78-card dataset with ASCII art symbols and interpretations
+src/modules/news.*        NEWS — RSS headline reader (CDC, WHO, ABC, BBC), NVS-cached
 src/modules/sysinfo.*     System diagnostics and brightness control
 src/net/wifi_mgr.*        WiFi credential handling and NVS storage
 src/persona/              SD persona loader and slot manager
 sd_card/                  Example SD card layout and setup files
 ```
+
+## v1.1.9 Changes
+
+- **ORACLE** — fully offline tarot reader with a complete 78-card deck (22 Major Arcana + 56 Minor Arcana). Three spread modes: single card, three-card Past/Present/Future, and five-card Celtic Cross. FONT_LARGE card names, FONT_MED ASCII art symbols unique to every card, scrollable upright and reversed interpretations. Spread tab bar with trackball left/right or direct touch tap to navigate positions. GT911 touch support throughout. Optional SD save to `/oracle/readings/`.
+- **NEWS** — live RSS headline reader pulling from four feeds (CDC, WHO, ABC News, BBC World). Two-line word-wrapped headlines, feed badge color-coded by source, 30-minute NVS cache with stale indicator, trackball scroll.
+- **TRAFFIC switched to TomTom** — TRAFFIC now uses the TomTom Traffic Incidents API (`tomtom.txt` key on SD). The OpenWebNinja Waze API enforced aggressive rate limits that made its endpoints unreliable. TomTom provides accident, jam, road-closure, and hazard data with GPS bounding-box queries and no rate-limit issues. Incidents include direction/distance from your location via Nominatim reverse geocoding when road names are unavailable.
+- **POLICE and ROAD tiles removed** — OpenWebNinja Waze police and road-closure endpoints remain too rate-limited for practical field use. Their home-screen slots are now ORACLE and NEWS.
+- **UI polish** — home status bar and bottom bar text fully themed (`g_themeColor` throughout); weather tile icon replaced with a radar scope; ORACLE menu and card text sized up for readability; news fetch progress text themed.
+- **Trackball fix** — corrected left/right inversion for ORACLE spread navigation (T-Deck physical left = logical right, matching the home screen's existing swap).
 
 ## v1.1.8 Changes
 
@@ -329,7 +360,7 @@ All SD setup files persist until you delete them. Remove them manually after con
 
 - **`wifi.txt`** — contains WiFi credentials
 - **`portal.txt`** — contains your backend URL
-- **`waze.txt`** — contains your Waze API key
+- **`tomtom.txt`** — contains your TomTom API key
 - **`donki.txt`** — contains your NASA API key
 - **Persona files** — may contain private system prompts
 

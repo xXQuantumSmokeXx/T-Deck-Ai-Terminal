@@ -9,6 +9,7 @@
 #include <ArduinoJson.h>
 #include <TinyGPS++.h>
 #include <time.h>
+#include <math.h>
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 #define KB_ADDR         0x55
@@ -21,7 +22,8 @@
 #define WAZE_MAX_ITEMS  25
 #define WAZE_VISIBLE    10          // rows visible at once  (CONTENT_H/WAZE_ROW_H)
 #define WAZE_ROW_H      18
-#define WAZE_CACHE_TTL  900         // 15 minutes
+#define WAZE_CACHE_TTL      900     // 15 minutes
+#define WAZE_RATELIMIT_TTL  3600    // 1 hour backoff after 429
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
 enum WazeMode { WAZE_HAZARD, WAZE_POLICE, WAZE_ROAD };
@@ -33,44 +35,32 @@ static const char* modeTitle() {
     switch (s_mode) {
         case WAZE_POLICE: return "< HOME | POLICE";
         case WAZE_ROAD:   return "< HOME | ROAD";
-        default:          return "< HOME | HAZARDS";
+        default:          return "< HOME | TRAFFIC";
     }
 }
-static const char* modeAlertTypes() {
-    switch (s_mode) {
-        case WAZE_POLICE: return "POLICE";
-        case WAZE_ROAD:   return "ROAD_CLOSED,JAM";
-        default:          return "ACCIDENT,HAZARD";
-    }
-}
-static int modeMaxAlerts() { return s_mode == WAZE_ROAD ? 10 : 20; }
-static int modeMaxJams()    { return s_mode == WAZE_ROAD ? 10 : 0;  }
 static const char* modeClearMsg() {
     switch (s_mode) {
         case WAZE_POLICE: return "No police reported nearby";
         case WAZE_ROAD:   return "Roads are open";
-        default:          return "No hazards nearby";
+        default:          return "No incidents nearby";
     }
 }
 static const char* modeCachePrefix() {
-    switch (s_mode) {
-        case WAZE_POLICE: return "waze_p";
-        case WAZE_ROAD:   return "waze_r";
-        default:          return "waze_h";
-    }
+    // Traffic uses TomTom (separate cache); Police+Road use openwebninja (shared)
+    return (s_mode == WAZE_HAZARD) ? "tom_a" : "waze_a";
 }
 static uint16_t colorFromBadge(const char *badge) {
     if (strcmp(badge, "[POL]") == 0) return COL_AMBER;
     if (strcmp(badge, "[ACC]") == 0) return COL_RED;
     if (strcmp(badge, "[RD!]") == 0) return COL_RED;
-    if (strcmp(badge, "[JAM]") == 0) return COL_WHITE;
+    if (strcmp(badge, "[JAM]") == 0) return COL_AMBER;
     return COL_GOLD;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 struct WazeItem {
     char     badge[8];   // "[POL]", "[HAZ]", "[ACC]", "[JAM]", "[RD!]"
-    char     detail[52];
+    char     detail[80];
     uint16_t color;
 };
 
@@ -111,7 +101,7 @@ static uint16_t typeColor(const char *type) {
     if (strcmp(type, "POLICE") == 0)      return COL_AMBER;
     if (strcmp(type, "ACCIDENT") == 0)    return COL_RED;
     if (strcmp(type, "ROAD_CLOSED") == 0) return COL_RED;
-    if (strcmp(type, "JAM") == 0)         return COL_WHITE;
+    if (strcmp(type, "JAM") == 0)         return COL_AMBER;
     return COL_GOLD;  // HAZARD
 }
 
@@ -122,6 +112,25 @@ static const char* typeBadge(const char *type) {
     if (strcmp(type, "JAM") == 0)         return "[JAM]";
     if (strcmp(type, "ROAD_CLOSED") == 0) return "[RD!]";
     return "[???]";
+}
+
+static bool modeWantsItem(const WazeItem &item) {
+    switch (s_mode) {
+        case WAZE_POLICE:  return strcmp(item.badge, "[POL]") == 0;
+        case WAZE_ROAD:    return strcmp(item.badge, "[JAM]") == 0 || strcmp(item.badge, "[RD!]") == 0;
+        default:           return true;  // Traffic: all TomTom incidents are relevant
+    }
+}
+
+static void filterByMode() {
+    int n = 0;
+    for (int i = 0; i < s_itemCount; i++) {
+        if (modeWantsItem(s_items[i])) {
+            if (n != i) s_items[n] = s_items[i];
+            n++;
+        }
+    }
+    s_itemCount = n;
 }
 
 // ── GPS — hardware acquisition (Serial1, GPIO44/43, L76K GNSS) ───────────────
@@ -190,7 +199,6 @@ static bool loadCachedGPS() {
 static void parseWazeDoc(JsonDocument &doc) {
     s_itemCount = 0;
 
-    // Alerts array
     JsonArray alerts = doc["data"]["alerts"].as<JsonArray>();
     for (JsonObject a : alerts) {
         if (s_itemCount >= WAZE_MAX_ITEMS) break;
@@ -203,7 +211,6 @@ static void parseWazeDoc(JsonDocument &doc) {
         strlcpy(item.badge, typeBadge(type), sizeof(item.badge));
         item.color = typeColor(type);
 
-        // Prefer description when it looks useful; else format the subtype
         if (desc && strlen(desc) > 3 && strcmp(desc, "null") != 0) {
             strlcpy(item.detail, desc, sizeof(item.detail));
         } else {
@@ -213,7 +220,6 @@ static void parseWazeDoc(JsonDocument &doc) {
         }
     }
 
-    // Jams array (only used by WAZE_ROAD mode, but we parse either way)
     JsonArray jams = doc["data"]["jams"].as<JsonArray>();
     for (JsonObject j : jams) {
         if (s_itemCount >= WAZE_MAX_ITEMS) break;
@@ -222,9 +228,9 @@ static void parseWazeDoc(JsonDocument &doc) {
         strlcpy(item.badge, "[JAM]", sizeof(item.badge));
         item.color = COL_WHITE;
 
-        float speed  = j["speed_kmh"] | 0.0f;
+        float speed  = j["speed_kmh"]     | 0.0f;
         int   delay  = j["delay_seconds"] | 0;
-        float length = j["length"] | 0.0f;  // metres
+        float length = j["length"]        | 0.0f;
 
         if (delay > 60) {
             snprintf(item.detail, sizeof(item.detail), "+%dmin delay  %.0f kmh", delay / 60, speed);
@@ -236,11 +242,175 @@ static void parseWazeDoc(JsonDocument &doc) {
     }
 }
 
-// ── HTTP fetch ────────────────────────────────────────────────────────────────
-static bool fetchWaze() {
-    String key = nvsGetString("waze_key");
-    if (key.isEmpty()) {
-        strlcpy(s_errMsg, "NO API KEY - put key in waze.txt on SD", sizeof(s_errMsg));
+// ── Distance + cardinal direction from GPS to a coordinate ───────────────────
+static void dirDist(float toLat, float toLon, char *buf, size_t size) {
+    if (!s_gpsValid || (toLat == 0.0f && toLon == 0.0f)) { buf[0] = 0; return; }
+    float dLat = (toLat - s_lat) * 0.01745329f;
+    float dLon = (toLon - s_lon) * 0.01745329f;
+    float la1  = s_lat * 0.01745329f;
+    float la2  = toLat * 0.01745329f;
+    float a    = sinf(dLat/2)*sinf(dLat/2) + cosf(la1)*cosf(la2)*sinf(dLon/2)*sinf(dLon/2);
+    float dist = 6371.0f * 2.0f * atan2f(sqrtf(a), sqrtf(1.0f-a));
+    float brg  = atan2f(sinf(dLon)*cosf(la2),
+                        cosf(la1)*sinf(la2) - sinf(la1)*cosf(la2)*cosf(dLon));
+    brg = brg * 57.2957795f;
+    if (brg < 0) brg += 360.0f;
+    const char *dirs[] = {"N","NE","E","SE","S","SW","W","NW"};
+    int di = ((int)((brg + 22.5f) / 45.0f)) % 8;
+    if (dist < 1.0f)
+        snprintf(buf, size, "%.0fm %s", dist * 1000.0f, dirs[di]);
+    else
+        snprintf(buf, size, "%.1fkm %s", dist, dirs[di]);
+}
+
+// ── Reverse Geocoding via Nominatim (OSM, no key required) ───────────────────
+static void reverseGeocode(float lat, float lon, char *buf, size_t sz) {
+    buf[0] = 0;
+    char url[180];
+    snprintf(url, sizeof(url),
+        "https://nominatim.openstreetmap.org/reverse?format=json&lat=%.6f&lon=%.6f",
+        lat, lon);
+    WiFiClientSecure cl;
+    cl.setInsecure();
+    HTTPClient http;
+    http.begin(cl, url);
+    http.addHeader("User-Agent", "T-Deck-Ai-Terminal/1.0 (ESP32)");
+    http.setTimeout(8000);
+    int code = http.GET();
+    if (code != 200) { http.end(); return; }
+    String json = http.getString();
+    http.end();
+    JsonDocument rdoc;
+    if (deserializeJson(rdoc, json)) return;
+    const char *road = rdoc["address"]["road"] | "";
+    if (strlen(road) > 2) { strlcpy(buf, road, sz); return; }
+    // Fall back to display_name first segment (before comma)
+    const char *display = rdoc["display_name"] | "";
+    strlcpy(buf, display, sz);
+    char *comma = strchr(buf, ',');
+    if (comma) *comma = 0;
+}
+
+// ── TomTom Traffic Incidents API ─────────────────────────────────────────────
+static const char* tomtomCatName(int cat) {
+    switch (cat) {
+        case 1:  return "Accident";
+        case 2:  return "Fog";
+        case 3:  return "Dangerous conditions";
+        case 4:  return "Rain";
+        case 5:  return "Ice";
+        case 6:  return "Traffic jam";
+        case 7:  return "Lane closed";
+        case 8:  return "Road closed";
+        case 9:  return "Road works";
+        case 10: return "High wind";
+        case 11: return "Flooding";
+        case 13: return "Broken down vehicle";
+        default: return "Hazard";
+    }
+}
+
+static void parseTomTomDoc(JsonDocument &doc) {
+    s_itemCount = 0;
+    int geocodesDone = 0;
+    JsonArray incidents = doc["incidents"].as<JsonArray>();
+    for (JsonObject inc : incidents) {
+        if (s_itemCount >= WAZE_MAX_ITEMS) break;
+        WazeItem &item = s_items[s_itemCount++];
+
+        JsonObject props = inc["properties"];
+        int         cat   = props["iconCategory"] | 0;
+        const char *from    = props["from"] | "";
+        const char *to      = props["to"]   | "";
+        int         delaySec = props["delay"] | 0;
+
+        switch (cat) {
+            case 1: case 13: strlcpy(item.badge, "[ACC]", sizeof(item.badge)); item.color = COL_RED;   break;
+            case 6:          strlcpy(item.badge, "[JAM]", sizeof(item.badge)); item.color = COL_AMBER; break;
+            case 7: case 8:  strlcpy(item.badge, "[RD!]", sizeof(item.badge)); item.color = COL_RED;   break;
+            default:         strlcpy(item.badge, "[HAZ]", sizeof(item.badge)); item.color = COL_GOLD;  break;
+        }
+
+        float incLat = 0.0f, incLon = 0.0f;
+        JsonObject geom = inc["geometry"];
+        const char *geomType = geom["type"] | "";
+        if (strcmp(geomType, "Point") == 0) {
+            JsonArray coords = geom["coordinates"].as<JsonArray>();
+            if (coords.size() >= 2) { incLon = coords[0] | 0.0f; incLat = coords[1] | 0.0f; }
+        } else if (strcmp(geomType, "LineString") == 0) {
+            JsonArray coords = geom["coordinates"].as<JsonArray>();
+            if (coords.size() >= 1) {
+                JsonArray pt = coords[0].as<JsonArray>();
+                if (pt.size() >= 2) { incLon = pt[0] | 0.0f; incLat = pt[1] | 0.0f; }
+            }
+        }
+
+        String roadStr;
+        JsonArray roads = props["roadNumbers"].as<JsonArray>();
+        for (size_t ri = 0; ri < roads.size() && ri < 2; ri++) {
+            const char *r = roads[ri] | "";
+            if (strlen(r) > 0) { if (roadStr.length() > 0) roadStr += "/"; roadStr += r; }
+        }
+
+        JsonArray events = props["events"].as<JsonArray>();
+        const char *desc = events.size() > 0 ? (events[0]["description"] | "") : "";
+        const char *base = strlen(desc) > 2 ? desc : tomtomCatName(cat);
+
+        if (strlen(from) > 2) {
+            if (strlen(to) > 2 && strcmp(from, to) != 0)
+                snprintf(item.detail, sizeof(item.detail), "%s > %s", from, to);
+            else
+                strlcpy(item.detail, from, sizeof(item.detail));
+        } else if (roadStr.length() > 0) {
+            snprintf(item.detail, sizeof(item.detail), "%s: %s", roadStr.c_str(), base);
+        } else {
+            // No road info from TomTom — reverse-geocode the coordinates (max 3 per fetch)
+            char road[40] = "";
+            if (geocodesDone < 3 && (incLat != 0.0f || incLon != 0.0f)) {
+                if (geocodesDone > 0) delay(1100);  // Nominatim rate limit: 1 req/s
+                reverseGeocode(incLat, incLon, road, sizeof(road));
+                geocodesDone++;
+            }
+            if (strlen(road) > 2)
+                snprintf(item.detail, sizeof(item.detail), "%s: %s", road, base);
+            else
+                strlcpy(item.detail, base, sizeof(item.detail));
+        }
+
+        if (incLat != 0.0f || incLon != 0.0f) {
+            char dd[14];
+            dirDist(incLat, incLon, dd, sizeof(dd));
+            if (strlen(dd) > 0 && strlen(item.detail) + strlen(dd) + 2 < sizeof(item.detail)) {
+                strlcat(item.detail, " ", sizeof(item.detail));
+                strlcat(item.detail, dd, sizeof(item.detail));
+            }
+        }
+
+        if (delaySec > 60) {
+            char dsuf[12];
+            snprintf(dsuf, sizeof(dsuf), " +%dmin", delaySec / 60);
+            if (strlen(item.detail) + strlen(dsuf) < sizeof(item.detail))
+                strlcat(item.detail, dsuf, sizeof(item.detail));
+        }
+    }
+}
+
+static bool fetchTomTom(bool forceRetry = false) {
+    if (!forceRetry) {
+        int32_t rl_ts = nvsGetInt("waze_rl");
+        if (rl_ts != 0) {
+            int32_t elapsed = (int32_t)time(nullptr) - rl_ts;
+            if (elapsed < WAZE_RATELIMIT_TTL) {
+                int mins = (WAZE_RATELIMIT_TTL - elapsed) / 60 + 1;
+                snprintf(s_errMsg, sizeof(s_errMsg), "Rate limited - retry in ~%d min", mins);
+                return false;
+            }
+        }
+    }
+
+    String apiKey = nvsGetString("tomtom_key");
+    if (apiKey.isEmpty()) {
+        strlcpy(s_errMsg, "NO KEY - put TomTom key in tomtom.txt on SD", sizeof(s_errMsg));
         return false;
     }
     if (!s_gpsValid) {
@@ -248,24 +418,34 @@ static bool fetchWaze() {
         return false;
     }
 
+    float dlat = 0.018f;
+    float dlon = 0.018f / cosf(s_lat * 0.01745329f);
+
     char url[320];
     snprintf(url, sizeof(url),
-        "https://api.openwebninja.com/waze/alerts-and-jams"
-        "?center=%.5f,%.5f&radius=%s&radius_units=%s"
-        "&alert_types=%s&max_alerts=%d&max_jams=%d",
-        s_lat, s_lon, WAZE_RADIUS, WAZE_RADIUS_UNIT,
-        modeAlertTypes(), modeMaxAlerts(), modeMaxJams());
+        "https://api.tomtom.com/traffic/services/5/incidentDetails"
+        "?key=%s&bbox=%.5f,%.5f,%.5f,%.5f"
+        "&language=en-GB&categoryFilter=0,1,2,3,4,5,6,7,8,9,10,11"
+        "&timeValidityFilter=present",
+        apiKey.c_str(),
+        s_lon - dlon, s_lat - dlat,
+        s_lon + dlon, s_lat + dlat);
 
     WiFiClientSecure client;
     client.setInsecure();
     HTTPClient http;
     http.begin(client, url);
-    http.addHeader("x-api-key", key);
     http.setTimeout(12000);
 
     int code = http.GET();
+    if (code == 429) {
+        nvsPutInt("waze_rl", (int32_t)time(nullptr));
+        strlcpy(s_errMsg, "Rate limited (429) - retry in ~60 min", sizeof(s_errMsg));
+        http.end();
+        return false;
+    }
     if (code != 200) {
-        snprintf(s_errMsg, sizeof(s_errMsg), "API error %d", code);
+        snprintf(s_errMsg, sizeof(s_errMsg), "TomTom error %d", code);
         http.end();
         return false;
     }
@@ -279,6 +459,78 @@ static bool fetchWaze() {
         return false;
     }
 
+    nvsPutInt("waze_rl", 0);
+    strlcpy(s_errMsg, "", sizeof(s_errMsg));
+    parseTomTomDoc(doc);
+    return true;
+}
+
+// ── HTTP fetch — openwebninja Waze API (Police + Road only) ──────────────────
+static bool fetchWaze(bool forceRetry = false) {
+    if (!forceRetry) {
+        int32_t rl_ts = nvsGetInt("waze_rl");
+        if (rl_ts != 0) {
+            int32_t elapsed = (int32_t)time(nullptr) - rl_ts;
+            if (elapsed < WAZE_RATELIMIT_TTL) {
+                int mins = (WAZE_RATELIMIT_TTL - elapsed) / 60 + 1;
+                snprintf(s_errMsg, sizeof(s_errMsg), "Rate limited - retry in ~%d min", mins);
+                return false;
+            }
+        }
+    }
+
+    if (!s_gpsValid) {
+        strlcpy(s_errMsg, "NO LOCATION - press L to enter coords", sizeof(s_errMsg));
+        return false;
+    }
+
+    // ~2 km bounding box around GPS position
+    float dlat = 0.018f;
+    float dlon = 0.018f / cosf(s_lat * 0.01745329f);
+
+    String apiKey = nvsGetString("waze_key");
+    if (apiKey.isEmpty()) {
+        strlcpy(s_errMsg, "NO API KEY - put key in waze.txt on SD", sizeof(s_errMsg));
+        return false;
+    }
+
+    char url[320];
+    snprintf(url, sizeof(url),
+        "https://api.openwebninja.com/waze/alerts-and-jams"
+        "?center=%.5f,%.5f&radius=%s&radius_units=%s"
+        "&alert_types=ACCIDENT,HAZARD,POLICE,ROAD_CLOSED,JAM&max_alerts=25&max_jams=10",
+        s_lat, s_lon, WAZE_RADIUS, WAZE_RADIUS_UNIT);
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    http.begin(client, url);
+    http.addHeader("x-api-key", apiKey);
+    http.setTimeout(12000);
+
+    int code = http.GET();
+    if (code == 429) {
+        nvsPutInt("waze_rl", (int32_t)time(nullptr));
+        strlcpy(s_errMsg, "Rate limited (429) - retry in ~60 min", sizeof(s_errMsg));
+        http.end();
+        return false;
+    }
+    if (code != 200) {
+        snprintf(s_errMsg, sizeof(s_errMsg), "Waze API error %d", code);
+        http.end();
+        return false;
+    }
+
+    String json = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    if (deserializeJson(doc, json)) {
+        strlcpy(s_errMsg, "JSON parse error", sizeof(s_errMsg));
+        return false;
+    }
+
+    nvsPutInt("waze_rl", 0);
     strlcpy(s_errMsg, "", sizeof(s_errMsg));
     parseWazeDoc(doc);
     return true;
@@ -346,7 +598,7 @@ static void drawWazeScreen() {
         char gpsBuf[40];
         snprintf(gpsBuf, sizeof(gpsBuf), "%.4f, %.4f%s",
                  s_lat, s_lon, s_gpsCached ? " (cached)" : " (GPS)");
-        s_tft->setTextColor(s_gpsCached ? COL_GREY_MID : g_themeColor, COL_BG);
+        s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawString(gpsBuf, 4, TOPBAR_H + 3);
     } else {
         s_tft->setTextColor(COL_AMBER, COL_BG);
@@ -379,7 +631,7 @@ static void drawWazeScreen() {
             s_tft->setTextColor(g_themeColor, COL_BG);
             s_tft->drawCentreString("ALL CLEAR", SCREEN_W / 2, y + 22, FONT_MED);
             s_tft->setTextFont(FONT_SMALL);
-            s_tft->setTextColor(COL_GREY_MID, COL_BG);
+            s_tft->setTextColor(g_themeColor, COL_BG);
             s_tft->drawCentreString(modeClearMsg(), SCREEN_W / 2, y + 44, FONT_SMALL);
         } else {
             s_tft->setTextColor(COL_AMBER, COL_BG);
@@ -415,7 +667,7 @@ static void drawWazeScreen() {
             det.remove(det.length() - 1);
         if (det.length() < strlen(item.detail) && det.length() > 2)
             det = det.substring(0, det.length() - 2) + "..";
-        s_tft->setTextColor(COL_WHITE, COL_BG);
+        s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawString(det, bw + 2, ry + 1);
 
         if (i < visible - 1)
@@ -428,7 +680,7 @@ static void drawWazeScreen() {
         snprintf(sbuf, sizeof(sbuf), "%d-%d/%d",
                  s_scrollOff + 1, min(s_scrollOff + WAZE_VISIBLE, s_itemCount), s_itemCount);
         int sw = s_tft->textWidth(sbuf);
-        s_tft->setTextColor(COL_GREY_MID, COL_BG);
+        s_tft->setTextColor(g_themeColor, COL_BG);
         s_tft->drawString(sbuf, SCREEN_W - sw - 4, y);
     }
 
@@ -447,7 +699,7 @@ static void showLoadingScreen() {
 
     const char *heading = (s_mode == WAZE_POLICE) ? "POLICE ALERTS"
                         : (s_mode == WAZE_ROAD)   ? "ROAD & JAMS"
-                        :                           "HAZARD ALERTS";
+                        :                           "TRAFFIC ALERTS";
     s_tft->drawCentreString(heading, SCREEN_W / 2, CONTENT_Y + 14, FONT_MED);
     s_tft->setTextFont(FONT_SMALL);
     s_tft->setTextColor(COL_GREY_MID, COL_BG);
@@ -457,8 +709,11 @@ static void showLoadingScreen() {
 static void showFetching() {
     s_tft->fillRect(0, CONTENT_Y + 30, SCREEN_W, 20, COL_BG);
     s_tft->setTextFont(FONT_SMALL);
-    s_tft->setTextColor(COL_GREY_MID, COL_BG);
-    s_tft->drawCentreString("Fetching Waze data...", SCREEN_W / 2, CONTENT_Y + 34, FONT_SMALL);
+    s_tft->setTextColor(g_themeColor, COL_BG);
+    const char *msg = (s_mode == WAZE_HAZARD) ? "Fetching TomTom data..."
+                    : (s_mode == WAZE_POLICE)  ? "Fetching police data..."
+                    :                            "Fetching road data...";
+    s_tft->drawCentreString(msg, SCREEN_W / 2, CONTENT_Y + 34, FONT_SMALL);
 }
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
@@ -531,6 +786,7 @@ static void wazeInitCommon(TFT_eSPI &tft) {
 
     // Use cached data if still fresh — no loading screen
     if (loadWazeCache()) {
+        filterByMode();
         drawWazeScreen();
         return;
     }
@@ -539,7 +795,8 @@ static void wazeInitCommon(TFT_eSPI &tft) {
 
     if (s_gpsValid && WiFi.isConnected()) {
         showFetching();
-        if (fetchWaze()) saveWazeCache();
+        bool ok = (s_mode == WAZE_HAZARD) ? fetchTomTom() : fetchWaze();
+        if (ok) { saveWazeCache(); filterByMode(); }
     } else if (!s_gpsValid) {
         strlcpy(s_errMsg, "No location — press L to enter coords, G for GPS", sizeof(s_errMsg));
     }
@@ -567,7 +824,8 @@ static bool wazeLoopImpl(TFT_eSPI &tft) {
         if (!s_gpsValid) loadCachedGPS();
         if (s_gpsValid && WiFi.isConnected()) {
             showFetching();
-            if (fetchWaze()) saveWazeCache();
+            bool ok = (s_mode == WAZE_HAZARD) ? fetchTomTom(true) : fetchWaze(true);
+            if (ok) { saveWazeCache(); filterByMode(); }
         }
         drawWazeScreen();
     }
@@ -579,7 +837,8 @@ static bool wazeLoopImpl(TFT_eSPI &tft) {
         s_scrollOff  = 0;
         if (s_gpsValid && WiFi.isConnected()) {
             showFetching();
-            if (fetchWaze()) saveWazeCache();
+            bool ok = (s_mode == WAZE_HAZARD) ? fetchTomTom() : fetchWaze();
+            if (ok) { saveWazeCache(); filterByMode(); }
         }
         drawWazeScreen();
     }
@@ -592,7 +851,8 @@ static bool wazeLoopImpl(TFT_eSPI &tft) {
         if (tryHardwareGPS()) {
             if (WiFi.isConnected()) {
                 showFetching();
-                if (fetchWaze()) saveWazeCache();
+                bool ok = (s_mode == WAZE_HAZARD) ? fetchTomTom() : fetchWaze();
+                if (ok) { saveWazeCache(); filterByMode(); }
             }
         } else {
             strlcpy(s_errMsg, "GPS timeout — press L to enter coords manually", sizeof(s_errMsg));
