@@ -299,58 +299,6 @@ Use CoinGecko slugs, not ticker symbols. Falls back to `/coins.txt`, then to any
 
 All data screens NVS-cache their last successful fetch so they display instantly on re-open and stay useful during brief offline periods. Press **R** on any data screen to force a fresh fetch.
 
-## Project Layout
-
-```txt
-src/main.cpp              Boot flow, splash logo, screen router, trackball and keyboard handling
-src/ui/                   Theme constants, home launcher, shared widgets (drawMenuBar, drawTopbar, etc.)
-src/modules/chat.*        AI chat client, persona context, command handling
-src/modules/weather.*     Weather dashboard and location configuration
-src/modules/solar.*       Solar / space-weather dashboard
-src/modules/btc.*         Crypto dashboard and CoinGecko favorites
-src/modules/noaa.*        CODEX hub — MY LOGS field notes and LIBRARY book reader router
-src/modules/scripture.*   LIBRARY — SD book indexer, chapter browser, paragraph-reflowed reader
-src/modules/world.*       FIRES and USGS earthquake feeds
-src/modules/shtf.*        SHTF monitor: NWS + FEMA + bio feeds + threat index
-src/modules/waze.*        TRAFFIC — Waze hazard and road incident screen
-src/modules/sigil.*       ORACLE — offline tarot reader, 78-card deck, spread layouts, touch nav
-src/modules/sigil_cards.h Full 78-card dataset with ASCII art symbols and interpretations
-src/modules/news.*        NEWS — RSS headline reader (CDC, WHO, ABC, BBC), NVS-cached
-src/modules/sysinfo.*     System diagnostics and brightness control
-src/net/wifi_mgr.*        WiFi credential handling and NVS storage
-src/persona/              SD persona loader and slot manager
-sd_card/                  Example SD card layout and setup files
-```
-
-## v1.1.9 Changes
-
-- **ORACLE** — fully offline tarot reader with a complete 78-card deck (22 Major Arcana + 56 Minor Arcana). Three spread modes: single card, three-card Past/Present/Future, and five-card Celtic Cross. FONT_LARGE card names, FONT_MED ASCII art symbols unique to every card, scrollable upright and reversed interpretations. Spread tab bar with trackball left/right or direct touch tap to navigate positions. GT911 touch support throughout. Optional SD save to `/oracle/readings/`.
-- **NEWS** — live RSS headline reader pulling from four feeds (CDC, WHO, ABC News, BBC World). Two-line word-wrapped headlines, feed badge color-coded by source, 30-minute NVS cache with stale indicator, trackball scroll.
-- **TRAFFIC switched to TomTom** — TRAFFIC now uses the TomTom Traffic Incidents API (`tomtom.txt` key on SD). The OpenWebNinja Waze API enforced aggressive rate limits that made its endpoints unreliable. TomTom provides accident, jam, road-closure, and hazard data with GPS bounding-box queries and no rate-limit issues. Incidents include direction/distance from your location via Nominatim reverse geocoding when road names are unavailable.
-- **POLICE and ROAD tiles removed** — OpenWebNinja Waze police and road-closure endpoints remain too rate-limited for practical field use. Their home-screen slots are now ORACLE and NEWS.
-- **UI polish** — home status bar and bottom bar text fully themed (`g_themeColor` throughout); weather tile icon replaced with a radar scope; ORACLE menu and card text sized up for readability; news fetch progress text themed.
-- **Trackball fix** — corrected left/right inversion for ORACLE spread navigation (T-Deck physical left = logical right, matching the home screen's existing swap).
-
-## v1.1.8 Changes
-
-- **CODEX** hub replaces LOG — dual-mode screen combining **MY LOGS** (field notes) and **LIBRARY** (SD-hosted book reader)
-- **MY LOGS** — trackball now moves selection cursor (not scroll offset), enabling in-place edit and delete; status bar shows context-sensitive shortcuts (`E=EDIT  D=DEL  DEL=BACK`)
-- **LIBRARY** — KJV scripture reader with auto-generated chapter index, proximity-merge deduplication of Gutenberg dual headers, paragraph reflow to fix 70-char line wrapping, and FONT_MED display for readability
-- **Splash screen** redesign — larger text with Quantum Smoke sigil (double-stroked hexagon, inner diamond, crosshair ticks, smoke wisps, xX marks)
-- **Date in home status bar** — day of week, month, day, year displayed right-aligned in theme color when NTP is synced
-- **Consistent bottom bar** across all module screens — two horizontal border lines, all-caps shortcuts, no vertical dividers, `drawMenuBar()` shared widget used everywhere
-- **Bin renamed** to `Ai-Field-Terminal.bin` for M5Launcher installs
-
-## v1.1.7 Changes
-
-- Added **SHTF** monitor: NWS real-time active alerts (Extreme/Severe/Moderate), FEMA declared disasters (national, most recent), USGS significant earthquake feed as automatic FEMA fallback, CDC and ProMED RSS outbreak feeds, and a combined threat index with DISASTERS / BIOLOGICAL / COMBINED bars
-- Added **HAZARD**, **POLICE**, and **ROAD** screens powered by the OpenWebNinja Waze API — nearby alerts within 2 km, scrollable list, GPS-located
-- NVS response cache added to SHTF (30-min TTL) and all three Waze screens (15-min TTL, per-mode) — screens load instantly from cache on re-open, `~CACHE` indicator shown when displaying stored data
-- SHTF status label now displayed as `xX-CRITICAL-Xx` / `xX-ELEVATED-Xx` / `xX-NOMINAL-Xx`
-- SHTF threat index bars now render in the active theme color
-- Boot screen "Connecting to WiFi" and "Syncing time" text now renders in theme color
-- Waze API key loaded from `waze.txt` on SD card (see SD Card Setup)
-
 ## Security Notes
 
 All SD setup files persist until you delete them. Remove them manually after confirming each works.
