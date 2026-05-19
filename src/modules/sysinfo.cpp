@@ -12,8 +12,8 @@
 #define KB_ADDR          0x55
 #define BOARD_BL_PIN     42
 #define BL_PWM_CHANNEL   0
-#define FW_VERSION       "v1.1.8"
-#define FW_DESC          "CODEX + UI Polish"
+#define FW_VERSION       "v1.1.9"
+#define FW_DESC          "ORACLE + NEWS"
 
 // ── Data model ────────────────────────────────────────────────────────────────
 struct SysInfo {
