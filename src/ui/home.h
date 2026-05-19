@@ -11,9 +11,9 @@ enum TileID {
     TILE_FIRE    = 5,
     TILE_WORLD   = 6,
     TILE_SHTF    = 7,   // SHTF monitor: grid + outbreak + threat index
-    TILE_HAZARD  = 8,   // Waze: accidents + hazards
-    TILE_POLICE  = 9,   // Waze: police alerts
-    TILE_ROAD    = 10,  // Waze: road closures + jams
+    TILE_HAZARD  = 8,   // TomTom: traffic incidents
+    TILE_ORACLE  = 9,   // Oracle divination (implementation pending)
+    TILE_ROAD    = 10,  // News: RSS feed aggregator
     TILE_SYSINFO = 11,  // System info
     TILE_COUNT   = 12
 };

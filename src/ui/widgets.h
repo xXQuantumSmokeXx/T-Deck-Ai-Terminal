@@ -187,8 +187,8 @@ inline void drawBottomBar(TFT_eSPI &tft, const char *left, bool blinkState) {
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(g_themeColor, COL_BG);
     if (left && left[0]) tft.drawString(left, 4, y + 3);
-    else drawFooterName(tft, y);
-    drawBatteryIndicatorRight(tft, y + 1);
+    else drawFooterName(tft, y, g_themeColor);
+    drawBatteryIndicatorRight(tft, y + 1, g_themeColor);
 }
 
 // ── Status dot ────────────────────────────────────────────────────────────────

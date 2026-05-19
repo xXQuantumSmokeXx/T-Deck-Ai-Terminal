@@ -19,9 +19,9 @@ static const TileDef TILES[TILE_COUNT] = {
     { "FIRES",    COL_RED     },  // 5
     { "USGS",     COL_GREEN   },  // 6
     { "SHTF",     COL_RED     },  // 7  SHTF monitor
-    { "HAZARD",   COL_GOLD    },  // 8  Waze accidents + hazards
-    { "POLICE",   COL_AMBER   },  // 9  Waze police alerts
-    { "ROAD",     COL_RED     },  // 10 Waze road closures + jams
+    { "TRAFFIC",  COL_GOLD    },  // 8  TomTom traffic incidents
+    { "ORACLE",   COL_PURPLE  },  // 9  Oracle divination
+    { "NEWS",     COL_CYAN    },  // 10 RSS news feed
     { "SYSTEM",   COL_CYAN    },  // 11 System info
 };
 
@@ -64,19 +64,20 @@ static void drawTileIcon(TFT_eSPI &t, int idx, int cx, int cy) {
         break;
     }
 
-    case 1: { // WEATHER — sun peeking behind cloud
-        // Sun outline (upper-right of icon)
-        int sx = cx+7, sy = cy-9;
-        t.drawCircle(sx, sy, 5, C);
-        t.drawFastHLine(sx-9, sy, 3, C);
-        t.drawFastHLine(sx+6, sy, 3, C);
-        t.drawFastVLine(sx, sy-9, 3, C);
-        t.drawFastVLine(sx, sy+6, 3, C);
-        // Cloud (filled) — covers lower portion including part of sun
-        t.fillCircle(cx-8, cy+4, 7, C);
-        t.fillCircle(cx+1, cy,   9, C);
-        t.fillCircle(cx+9, cy+4, 6, C);
-        t.fillRect(cx-15, cy+4, 24, 9, C);
+    case 1: { // WEATHER — radar scope
+        // Outer ring + inner ring
+        t.drawCircle(cx, cy, 11, C);
+        t.drawCircle(cx, cy,  5, C);
+        // Cardinal tick marks
+        t.drawFastVLine(cx,    cy-14, 3, C);   // N
+        t.drawFastVLine(cx,    cy+12, 3, C);   // S
+        t.drawFastHLine(cx-14, cy,    3, C);   // W
+        t.drawFastHLine(cx+12, cy,    3, C);   // E
+        // Radar sweep (double-stroke, NE direction)
+        t.drawLine(cx, cy, cx+9,  cy-9,  C);
+        t.drawLine(cx, cy, cx+10, cy-10, C);
+        // Center pip
+        t.fillCircle(cx, cy, 2, C);
         break;
     }
 
@@ -122,15 +123,20 @@ static void drawTileIcon(TFT_eSPI &t, int idx, int cx, int cy) {
         break;
     }
 
-    case 5: { // FIRES — flame silhouette
-        // Outer flame fill
-        t.fillTriangle(cx, cy-13, cx-9, cy+4, cx+9, cy+4, C);
-        t.fillCircle(cx-4, cy+3, 7, C);
-        t.fillCircle(cx+4, cy+3, 7, C);
-        t.fillRect(cx-11, cy+3, 22, 8, C);
+    case 5: { // FIRES — campfire: crossed logs + flame
+        // Crossed logs (double-stroke for thickness)
+        t.drawLine(cx-11, cy+11, cx+4,  cy+3,  C);
+        t.drawLine(cx-10, cy+11, cx+5,  cy+3,  C);
+        t.drawLine(cx+11, cy+11, cx-4,  cy+3,  C);
+        t.drawLine(cx+10, cy+11, cx-5,  cy+3,  C);
+        // Flame above the logs
+        t.fillTriangle(cx, cy-13, cx-8, cy+1, cx+8, cy+1, C);
+        t.fillCircle(cx-4, cy-1, 5, C);
+        t.fillCircle(cx+4, cy-1, 5, C);
+        t.fillRect(cx-9, cy-1, 18, 5, C);
         // Inner hollow
-        t.fillTriangle(cx, cy-4, cx-4, cy+4, cx+4, cy+4, B);
-        t.fillCircle(cx, cy+4, 4, B);
+        t.fillTriangle(cx, cy-5, cx-4, cy+1, cx+4, cy+1, B);
+        t.fillCircle(cx, cy+1, 3, B);
         break;
     }
 
@@ -160,30 +166,49 @@ static void drawTileIcon(TFT_eSPI &t, int idx, int cx, int cy) {
         break;
     }
 
-    case 8: { // HAZARD — warning triangle with exclamation
-        t.drawLine(cx,    cy-12, cx-10, cy+8, C);
-        t.drawLine(cx-10, cy+8,  cx+10, cy+8, C);
-        t.drawLine(cx+10, cy+8,  cx,    cy-12, C);
-        t.drawLine(cx,    cy-10, cx-8,  cy+6, C);
-        t.drawLine(cx-8,  cy+6,  cx+8,  cy+6, C);
-        t.drawLine(cx+8,  cy+6,  cx,    cy-10, C);
-        t.fillRect(cx-1, cy-6, 3, 7, C);   // shaft
-        t.fillRect(cx-1, cy+3, 3, 3, C);   // dot
+    case 8: { // TRAFFIC — road + top-down car
+        // Road edge lines
+        t.drawFastVLine(cx-10, cy-13, 26, C);
+        t.drawFastVLine(cx+10, cy-13, 26, C);
+        // Centre dashes
+        t.drawFastVLine(cx, cy-13, 5, C);
+        t.drawFastVLine(cx, cy-3,  5, C);
+        t.drawFastVLine(cx, cy+7,  5, C);
+        // Top-down car (rounded rect + windshield + rear)
+        t.drawRoundRect(cx-6, cy-7, 12, 18, 2, C);
+        t.drawFastHLine(cx-4, cy-2, 8, C);
+        t.drawFastHLine(cx-4, cy+6, 8, C);
         break;
     }
 
-    case 9: { // POLICE — 6-point star (classic badge shape)
-        t.fillTriangle(cx, cy-12, cx-10, cy+4,  cx+10, cy+4,  C);  // top half
-        t.fillTriangle(cx, cy+12, cx-10, cy-4,  cx+10, cy-4,  C);  // bottom half
-        t.fillCircle(cx, cy, 4, B);  // centre hole
+    case 9: { // ORACLE — Eye of Providence
+        // Outer triangle (double-stroke)
+        t.drawTriangle(cx, cy-13, cx-13, cy+9, cx+13, cy+9, C);
+        t.drawTriangle(cx, cy-12, cx-12, cy+8, cx+12, cy+8, C);
+        // Eye almond shape
+        t.drawLine(cx-8, cy-1, cx,   cy-6, C);
+        t.drawLine(cx,   cy-6, cx+8, cy-1, C);
+        t.drawLine(cx-8, cy-1, cx,   cy+4, C);
+        t.drawLine(cx,   cy+4, cx+8, cy-1, C);
+        // Iris
+        t.drawCircle(cx, cy-1, 3, C);
+        // Pupil
+        t.fillCircle(cx, cy-1, 1, C);
         break;
     }
 
-    case 10: { // ROAD — road barrier (two posts + crossbars)
-        t.fillRect(cx-12, cy-10, 3, 20, C);  // left post
-        t.fillRect(cx+9,  cy-10, 3, 20, C);  // right post
-        t.fillRect(cx-9,  cy-7,  18, 3, C);  // top bar
-        t.fillRect(cx-9,  cy+4,  18, 3, C);  // bottom bar
+    case 10: { // NEWS — TV monitor with antenna
+        // Screen
+        t.drawRoundRect(cx-11, cy-5, 22, 14, 2, C);
+        // Text lines on screen
+        t.drawFastHLine(cx-7, cy-1, 14, C);
+        t.drawFastHLine(cx-7, cy+4,  9, C);
+        // Antenna arms
+        t.drawLine(cx-3, cy-5, cx-9, cy-15, C);
+        t.drawLine(cx+3, cy-5, cx+9, cy-15, C);
+        // Stand + base
+        t.drawFastVLine(cx, cy+9, 4, C);
+        t.drawFastHLine(cx-6, cy+13, 12, C);
         break;
     }
 

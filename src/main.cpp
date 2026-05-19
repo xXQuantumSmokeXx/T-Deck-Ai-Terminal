@@ -20,7 +20,9 @@
 #include "modules/noaa.h"
 #include "modules/world.h"
 #include "modules/waze.h"
+#include "modules/news.h"
 #include "modules/shtf.h"
+#include "modules/sigil.h"
 
 // ── Touch ─────────────────────────────────────────────────────────────────────
 #define TOUCH_INT_PIN   16
@@ -66,7 +68,7 @@ static void initBrightness() {
 }
 
 // ── Screen state ──────────────────────────────────────────────────────────────
-enum Screen { SCR_HOME, SCR_CHAT, SCR_WEATHER, SCR_SOLAR, SCR_BTC, SCR_SYSINFO, SCR_ALERTS, SCR_WORLD, SCR_HAZARD, SCR_POLICE, SCR_ROAD, SCR_SHTF, SCR_STUB };
+enum Screen { SCR_HOME, SCR_CHAT, SCR_WEATHER, SCR_SOLAR, SCR_BTC, SCR_SYSINFO, SCR_ALERTS, SCR_WORLD, SCR_HAZARD, SCR_ORACLE, SCR_ROAD, SCR_SHTF, SCR_STUB };
 
 static Screen    s_screen = SCR_HOME;
 static TFT_eSPI  tft;
@@ -179,9 +181,17 @@ static void handleScreenTrackball() {
     } else if (s_screen == SCR_WORLD) {
         if (up)   worldTrackballUp();
         if (down) worldTrackballDown();
-    } else if (s_screen == SCR_HAZARD || s_screen == SCR_POLICE || s_screen == SCR_ROAD) {
+    } else if (s_screen == SCR_HAZARD) {
         if (up)   wazeTrackballUp();
         if (down) wazeTrackballDown();
+    } else if (s_screen == SCR_ORACLE) {
+        if (up)    sigilTrackballUp();
+        if (down)  sigilTrackballDown();
+        if (left)  sigilTrackballRight();  // T-Deck physical left = logical right
+        if (right) sigilTrackballLeft();
+    } else if (s_screen == SCR_ROAD) {
+        if (up)   newsTrackballUp();
+        if (down) newsTrackballDown();
     } else if (s_screen == SCR_SHTF) {
         if (up)   shtfTrackballUp();
         if (down) shtfTrackballDown();
@@ -353,7 +363,8 @@ static void handleModuleTouch() {
         if (now - s_lastTapMs > 300) {
             s_lastTapMs = now;
             s_prevTouched = false;
-            if (s_screen == SCR_ALERTS) noaaTouchTap(s_tapX, s_tapY);
+            if      (s_screen == SCR_ALERTS) noaaTouchTap(s_tapX, s_tapY);
+            else if (s_screen == SCR_ORACLE) sigilTouchTap(s_tapX, s_tapY);
             return;
         }
     }
@@ -435,16 +446,16 @@ static void launchTile(TileID id) {
             drainTrackball(_u, _d, _l, _r);
             break;
         }
-        case TILE_POLICE: {
-            s_screen = SCR_POLICE;
-            wazePoliceInit(tft);
+        case TILE_ORACLE: {
+            s_screen = SCR_ORACLE;
+            sigilInit(tft);
             int _u, _d, _l, _r;
             drainTrackball(_u, _d, _l, _r);
             break;
         }
         case TILE_ROAD: {
             s_screen = SCR_ROAD;
-            wazeRoadInit(tft);
+            newsInit(tft);
             int _u, _d, _l, _r;
             drainTrackball(_u, _d, _l, _r);
             break;
@@ -601,23 +612,23 @@ static void showSplash() {
     // Corner border
     drawCornerBrackets(tft, 2, 2, SCREEN_W - 4, SCREEN_H - 4, g_themeColor, 16);
 
-    // Logo — centered horizontally, upper half of screen
-    drawSplashLogo(tft, SCREEN_W / 2, 84);
+    // Logo — moved up to leave room for larger text below
+    drawSplashLogo(tft, SCREEN_W / 2, 72);
 
     // Brand name
     tft.setTextFont(FONT_LARGE);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("MAYDAY", SCREEN_W / 2, 136, FONT_LARGE);
+    tft.drawCentreString("MAYDAY", SCREEN_W / 2, 114, FONT_LARGE);
 
     // Device name
     tft.setTextFont(FONT_MED);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("Ai Field Terminal", SCREEN_W / 2, 168, FONT_MED);
+    tft.drawCentreString("Ai-Field-Terminal", SCREEN_W / 2, 148, FONT_MED);
 
     // Studio tag
     tft.setTextFont(FONT_SMALL);
     tft.setTextColor(g_themeColor, COL_BG);
-    tft.drawCentreString("xXQuantum-SmokeXx", SCREEN_W / 2, 192, FONT_SMALL);
+    tft.drawCentreString("xXQuantum-SmokeXx", SCREEN_W / 2, 184, FONT_SMALL);
 
     delay(2200);
     tft.fillScreen(COL_BG);
@@ -697,6 +708,7 @@ void setup() {
     loadPortalUrlFromSD();
     loadDonkiKeyFromSD();
     loadWazeKeyFromSD();
+    loadSdKey("/tomtom.txt",       "tomtom_key");
     loadSdKey("/healthmap.txt",   "hmap_key");
     loadSdKey("/eia.txt",         "eia_key");
     loadSdKey("/poweroutage.txt", "poutage_key");
@@ -765,13 +777,14 @@ void loop() {
         handleScreenTrackball();
         if (!wazeHazardLoop(tft)) returnHome();
 
-    } else if (s_screen == SCR_POLICE) {
+    } else if (s_screen == SCR_ORACLE) {
         handleScreenTrackball();
-        if (!wazePoliceLoop(tft)) returnHome();
+        handleModuleTouch();
+        if (!sigilLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_ROAD) {
         handleScreenTrackball();
-        if (!wazeRoadLoop(tft)) returnHome();
+        if (!newsLoop(tft)) returnHome();
 
     } else if (s_screen == SCR_SHTF) {
         handleScreenTrackball();
