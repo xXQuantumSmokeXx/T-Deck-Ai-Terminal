@@ -74,9 +74,13 @@ The firmware reads plain text files from the SD card root on boot. All setup fil
 
 ### `wifi.txt`
 
+Plain two-line format: line 1 is the SSID, line 2 is the password. Do not include labels like `SSID:` or `Password:`.
+
+Example, if the SSID is `frog` and the password is `strawberry`:
+
 ```txt
-YourWiFiSSID
-YourWiFiPassword
+frog
+strawberry
 ```
 
 Read on boot, saved to NVS. Delete after confirmed working.
